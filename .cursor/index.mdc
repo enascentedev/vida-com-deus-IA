@@ -1,0 +1,44 @@
+---
+alwaysApply: true
+---
+
+Como as telas já foram geradas visualmente, o próximo passo é a implementação técnica. Abaixo, preparei um guia prático e o prompt mestre que você deve colar no Cursor para ele gerar o código fiel ao design:
+
+1. Estrutura de Arquivos Sugerida
+O Cursor trabalha melhor se você definir uma estrutura clara. Peça para ele criar:
+
+/src
+  /components
+    /ui (componentes do shadcn)
+    /layout (Sidebar, Topbar, MobileNav)
+    /post (CardPost, AIPanel, AudioPlayer)
+    /chat (ChatBubble, CitationBadge, SourceAccordion)
+    /admin (UsageStats, IngestionTable)
+  /hooks (useAuth, usePost, useChat)
+  /lib (utils.ts para tailwind-merge)
+  /pages (Home, PostDetail, Chat, Admin, Settings)
+	
+2. Prompt Mestre para o Cursor AI
+Copie e cole o texto abaixo no chat do Cursor (Ctrl+K ou no painel de Chat lateral) para iniciar a codificação das telas:
+
+PROMPT PARA O CURSOR:
+
+"Atue como um desenvolvedor Frontend Senior especializado em React, TypeScript e TailwindCSS. Vamos construir a aplicação 'Vida com Deus'.
+
+Stack: React + Vite + TailwindCSS + shadcn/ui + Lucide React (ícones). Estilo Visual: Minimalista, moderno, calmo e acolhedor. Cantos arredondados (rounded-xl), sombras suaves, bastante espaço em branco. Cores: Tema Light (Fundo: #FAFAFA, Cards: #FFFFFF, Texto: #1A1A1A) e Dark Mode (Fundo: #0F172A, Cards: #1E293B, Texto: #F8FAFC).
+
+Task 1: Setup de Layout (Shell do App) Crie um layout responsivo com uma Sidebar fixa à esquerda no Desktop e uma Bottom Navigation no Mobile. A Sidebar deve conter: Início, Explorar, Favoritos, Chat Bíblico e Monitoramento (Admin). No topo, uma Topbar com campo de busca e menu de perfil.
+
+Task 2: Tela Detalhe do Post (Referência ao design gerado) Implemente a página de detalhe do post com:
+
+Coluna da esquerda: Conteúdo textual legível com tipografia serifada para o trecho bíblico.
+Coluna da direita (Desktop) ou Abaixo (Mobile): Painel de IA usando Tabs do shadcn (Resumo, Tags, Devocional).
+Adicione estados de 'Skeleton Loading' e um botão 'Gerar IA' para posts sem conteúdo processado.
+Task 3: Chat Bíblico (RAG) Interface de chat com balões. As mensagens do assistente devem renderizar Badges (chips) para as citações bíblicas e um Accordion no final para os 'Trechos usados'.
+
+Por favor, comece estruturando os componentes base do shadcn e o layout principal."
+
+3. Dicas para otimizar no Cursor
+Iteração por Tela: Não peça todas as 10 telas de uma vez. Peça primeiro o Layout (Shell), depois a Home, depois o Detalhe, e assim por diante.
+Referência de Imagem: Se o seu Cursor tiver suporte a visão (Claude 3.5 Sonnet ou GPT-4o), você pode tirar um print das telas que eu gerei e anexar no chat do Cursor dizendo: "Siga exatamente este layout visual para o componente X".
+Monitoramento (Admin): Para a tela de monitoramento, peça para ele usar a biblioteca recharts para o gráfico de linha, pois ela combina perfeitamente com o estilo do shadcn/ui.
