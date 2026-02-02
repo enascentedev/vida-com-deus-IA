@@ -29,3 +29,6 @@
 ## Publicação
 - A biblioteca **não foi publicada** no npm.
 - Portanto, **não há conta** associada à publicação.
+
+## Documentacao
+1. [Registro de Features](./registro-features.md)
