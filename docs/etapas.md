@@ -30,5 +30,40 @@
 - A biblioteca **não foi publicada** no npm.
 - Portanto, **não há conta** associada à publicação.
 
+## Etapa 4 — Migracao Tailwind CSS v3 → v4
+
+### App principal
+
+- Atualizado `tailwindcss` de `^3.4.19` para `^4.1.18`.
+- Adicionado `@tailwindcss/postcss` (`^4.1.18`) como novo plugin PostCSS.
+- Removido `autoprefixer` (integrado ao Tailwind v4).
+- `postcss.config.js`: trocado plugin `tailwindcss` + `autoprefixer` por `@tailwindcss/postcss`.
+- `src/index.css`: substituidas diretivas `@tailwind base/components/utilities` por `@import "tailwindcss"`.
+- `src/index.css`: adicionado bloco `@theme` com tokens de cores e border-radius (migrados do JS).
+- `tailwind.config.js`: removidos `colors` e `borderRadius` do `extend` (agora definidos via CSS no `@theme`).
+
+### Biblioteca `vida-com-deus-ui`
+
+- Adicionado `tailwindcss: ^4.0.0` como `peerDependency`.
+- Adicionado `tailwindcss: ^4.1.18` como `devDependency`.
+
+## Etapa 5 — Documentacao e padronizacao
+
+### Padrao de registro de features
+
+- Criado `docs/registro-features.md` com template obrigatorio para registro de novas features.
+- Adicionado primeiro registro: "Atualizacao do Tailwind para v4".
+- Linkado em `docs/etapas.md`.
+
+### README do projeto
+
+- Reescrito `README.md` completo substituindo o template padrao do Vite.
+- Inclui: visao geral, motivacao da v2, funcionalidades, tech stack, arquitetura, instrucoes de instalacao e aprendizados.
+
+### Gitignore
+
+- Adicionado `CLAUDE.md` ao `.gitignore` para evitar commit de instrucoes locais do Claude Code.
+
 ## Documentacao
+
 1. [Registro de Features](./registro-features.md)
