@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Vida com Deus - Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display min-h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<div class="flex items-center bg-background-light dark:bg-background-dark p-4 pb-2 justify-between">
+<div class="text-[#0d141b] dark:text-white flex size-12 shrink-0 items-center justify-start">
+<span class="material-symbols-outlined cursor-pointer">arrow_back_ios</span>
+</div>
+<h2 class="text-[#0d141b] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center pr-12">Vida com Deus</h2>
+</div>
+<!-- Main Content Container -->
+<main class="flex-1 flex flex-col items-center justify-center px-6 pb-12">
+<!-- Welcome Header -->
+<div class="w-full max-w-[400px] text-center mb-8">
+<div class="mb-6 flex justify-center">
+<div class="size-16 bg-primary/10 rounded-2xl flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-4xl">church</span>
+</div>
+</div>
+<h2 class="text-[#0d141b] dark:text-white tracking-tight text-[28px] font-bold leading-tight pb-2">Seja bem-vindo</h2>
+<p class="text-[#4c739a] dark:text-slate-400 text-base font-normal leading-normal px-4">Entre na sua conta para continuar sua jornada espiritual</p>
+</div>
+<!-- Login Card -->
+<div class="w-full max-w-[400px] bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+<!-- Form Fields -->
+<div class="space-y-4">
+<div class="flex flex-col">
+<p class="text-[#0d141b] dark:text-slate-200 text-sm font-medium leading-normal pb-2">E-mail</p>
+<input class="form-input flex w-full rounded-lg text-[#0d141b] dark:text-white focus:outline-0 focus:ring-1 focus:ring-primary border border-[#cfdbe7] dark:border-slate-700 bg-white dark:bg-slate-800 h-12 placeholder:text-[#4c739a] px-4 text-base font-normal leading-normal" placeholder="exemplo@email.com" type="email"/>
+</div>
+<div class="flex flex-col">
+<div class="flex justify-between items-center pb-2">
+<p class="text-[#0d141b] dark:text-slate-200 text-sm font-medium leading-normal">Senha</p>
+<a class="text-primary text-sm font-medium hover:underline" href="#">Esqueceu a senha?</a>
+</div>
+<div class="flex w-full items-stretch">
+<input class="form-input flex w-full min-w-0 flex-1 rounded-lg text-[#0d141b] dark:text-white focus:outline-0 focus:ring-1 focus:ring-primary border border-[#cfdbe7] dark:border-slate-700 bg-white dark:bg-slate-800 h-12 placeholder:text-[#4c739a] px-4 rounded-r-none border-r-0 text-base font-normal leading-normal" placeholder="Sua senha" type="password"/>
+<div class="text-[#4c739a] dark:text-slate-400 flex border border-[#cfdbe7] dark:border-slate-700 bg-white dark:bg-slate-800 items-center justify-center px-3 rounded-r-lg border-l-0">
+<span class="material-symbols-outlined text-[20px] cursor-pointer">visibility</span>
+</div>
+</div>
+</div>
+<!-- Primary Login Button -->
+<button class="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-3 rounded-lg mt-4 transition-colors">
+                    Entrar
+                </button>
+</div>
+<!-- Divider -->
+<div class="relative my-8">
+<div class="absolute inset-0 flex items-center">
+<span class="w-full border-t border-slate-200 dark:border-slate-800"></span>
+</div>
+<div class="relative flex justify-center text-xs uppercase">
+<span class="bg-white dark:bg-slate-900 px-2 text-[#4c739a] dark:text-slate-400">Ou continue com</span>
+</div>
+</div>
+<!-- Social Login Buttons -->
+<div class="grid grid-cols-2 gap-4">
+<button class="flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+<img alt="Google Logo" class="size-5" data-alt="Logotipo colorido do Google" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlXp4u-XdolkUGl-pNazaRCVcoiyCOa_5KL9eto1FhDUdY41zW2z69gbD63FRGr--WOFtiLbLyz4PeR1ykudxQvOfP8UHncMXuaGCeSiHf0pR7kmLptLYF5k4NNglcUUUZimUzB7FCo5236rD_Nu6vsN-zv5OKOayOEJUCiJZ_fHf2XyMMD1elVOMJcriDAd54eaVuRt5aH334lrGXd4E7aBQouQjSCmMnkQzGld3y3TEYLXqwU6msFYD1DLESAz2Egn400i3q4tk"/>
+<span class="text-sm font-medium text-[#0d141b] dark:text-white">Google</span>
+</button>
+<button class="flex items-center justify-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 py-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-[20px] text-[#0d141b] dark:text-white">ios</span>
+<span class="text-sm font-medium text-[#0d141b] dark:text-white">Apple</span>
+</button>
+</div>
+</div>
+<!-- Create Account Link -->
+<div class="mt-8 text-center">
+<p class="text-[#4c739a] dark:text-slate-400 text-sm">
+                Não tem uma conta? 
+                <a class="text-primary font-semibold hover:underline" href="#">Criar conta agora</a>
+</p>
+</div>
+</main>
+<!-- Bottom Indicator (iOS style) -->
+<div class="h-5 bg-background-light dark:bg-background-dark"></div>
+<div class="flex justify-center pb-2">
+<div class="w-32 h-1 bg-slate-300 dark:bg-slate-700 rounded-full"></div>
+</div>
+</body></html>
