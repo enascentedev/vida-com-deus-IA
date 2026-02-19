@@ -2,17 +2,16 @@ import {
   Bell,
   BookOpen,
   ChevronRight,
-  Home as HomeIcon,
   MessageSquare,
   Mic,
   Search,
-  Settings,
-  Bookmark,
   Play,
   Star,
   Sparkles,
 } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 import { Button, Badge, Skeleton } from "vida-com-deus-ui"
+import { BottomNavigation } from "@/components/layout/BottomNavigation"
 
 /* -------------------------------------------------------------------------- */
 /*  Imagens placeholder (substituir por imagens reais depois)                  */
@@ -27,23 +26,42 @@ const AVATAR_URL = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde
 /* -------------------------------------------------------------------------- */
 function Topbar() {
   return (
-    <header className="flex items-center justify-between px-5 py-3">
-      <div className="flex items-center gap-2.5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50">
-          <Sparkles size={20} className="text-blue-600" />
+    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
+      <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/10">
+            <Sparkles size={20} className="text-blue-600" />
+          </div>
+          <h1 className="text-lg font-bold text-slate-800">Vida com Deus</h1>
         </div>
-        <h1 className="text-lg font-bold text-slate-800">Vida com Deus</h1>
+        <div className="flex items-center gap-2">
+          <button
+            className="flex size-10 items-center justify-center rounded-full hover:bg-slate-100"
+            aria-label="Notificações"
+          >
+            <Bell size={22} className="text-slate-600" />
+          </button>
+          <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-blue-100">
+            <img
+              src={AVATAR_URL}
+              alt="Avatar do usuário"
+              className="h-full w-full object-cover"
+            />
+          </div>
+        </div>
       </div>
-      <div className="flex items-center gap-3">
-        <button className="relative p-2" aria-label="Notificacoes">
-          <Bell size={22} className="text-slate-600" />
-        </button>
-        <div className="h-9 w-9 overflow-hidden rounded-full border-2 border-blue-100">
-          <img
-            src={AVATAR_URL}
-            alt="Avatar do usuario"
-            className="h-full w-full object-cover"
+      {/* Barra de busca */}
+      <div className="px-4 pb-3 max-w-2xl mx-auto">
+        <div className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 h-11">
+          <Search size={18} className="text-slate-400 shrink-0" />
+          <input
+            type="text"
+            placeholder="Buscar reflexões ou versículos..."
+            className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
           />
+          <button aria-label="Busca por voz">
+            <Mic size={18} className="text-slate-400" />
+          </button>
         </div>
       </div>
     </header>
@@ -51,90 +69,62 @@ function Topbar() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Barra de busca                                                             */
-/* -------------------------------------------------------------------------- */
-function SearchBar() {
-  return (
-    <div className="px-5 pb-4">
-      <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-        <Search size={18} className="text-slate-400" />
-        <input
-          type="text"
-          placeholder="Buscar reflexoes ou versiculos..."
-          className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
-        />
-        <button aria-label="Busca por voz">
-          <Mic size={18} className="text-slate-400" />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-/* -------------------------------------------------------------------------- */
 /*  Hero Card (Post do Dia)                                                    */
 /* -------------------------------------------------------------------------- */
 function HeroCard() {
+  const navigate = useNavigate()
   return (
-    <div className="px-5">
-      <div className="relative overflow-hidden rounded-3xl bg-slate-900 text-white shadow-xl">
-        {/* Imagem de fundo com overlay */}
-        <div className="absolute inset-0 z-0">
+    <div className="px-4 py-4">
+      <div className="relative overflow-hidden rounded-xl shadow-lg bg-slate-900 text-white">
+        {/* Badge */}
+        <div className="absolute top-4 left-4 z-10">
+          <Badge className="border-none bg-blue-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider hover:bg-blue-600">
+            Post do Dia
+          </Badge>
+        </div>
+        {/* Imagem */}
+        <div className="w-full aspect-[16/9] relative">
           <img
             src={HERO_IMAGE}
-            alt="Montanhas ao amanhecer"
-            className="h-full w-full object-cover opacity-60"
+            alt="Pôr do sol sobre lago, representando paz"
+            className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
         </div>
-
-        <div className="relative z-10 space-y-4 p-6">
-          <Badge className="border-none bg-blue-600 px-3 hover:bg-blue-600">
-            POST DO DIA
-          </Badge>
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wider text-slate-300">
-              24 de maio, 2024
-            </p>
-            <h2 className="text-2xl font-bold leading-tight">
-              Encontrando Paz no Meio do Caos
-            </h2>
-          </div>
-          <div className="flex items-center justify-between pt-2">
+        {/* Conteúdo */}
+        <div className="absolute bottom-0 w-full p-5">
+          <p className="text-xs opacity-80 mb-1 uppercase font-medium">24 de Maio, 2024</p>
+          <h2 className="text-2xl font-bold leading-tight mb-3">
+            Encontrando Paz no Meio do Caos
+          </h2>
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm">
-              <BookOpen size={18} className="text-blue-400" />
+              <BookOpen size={16} className="text-blue-400" />
               <span>Salmos 23:1</span>
             </div>
-            <Button className="rounded-xl bg-blue-600 px-6 hover:bg-blue-700">
-              Ler Reflexao
+            <Button
+              onClick={() => navigate("/post/1")}
+              className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold hover:bg-blue-700"
+            >
+              Ler Reflexão
             </Button>
           </div>
         </div>
       </div>
-    </div>
-  )
-}
 
-/* -------------------------------------------------------------------------- */
-/*  Banner de Audio                                                            */
-/* -------------------------------------------------------------------------- */
-function AudioBanner() {
-  return (
-    <div className="px-5 pt-4">
-      <div className="flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3">
+      {/* AI Insight Trigger */}
+      <div className="mt-3 bg-blue-600/5 border border-blue-600/20 rounded-xl p-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
-            <Settings size={16} className="text-blue-600" />
-          </div>
-          <span className="text-sm font-medium text-blue-800">
-            Quer um resumo em audio desta reflexao?
-          </span>
+          <Sparkles size={20} className="text-blue-600 shrink-0" />
+          <p className="text-xs font-medium text-blue-700">
+            Quer um resumo em áudio desta reflexão?
+          </p>
         </div>
         <button
           className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600"
-          aria-label="Ouvir audio"
+          aria-label="Ouvir áudio"
         >
-          <Play size={14} className="text-white" fill="white" />
+          <Play size={14} className="text-white fill-white" />
         </button>
       </div>
     </div>
@@ -163,26 +153,29 @@ function RecentPost({
   isNew,
   isStarred,
 }: RecentPostProps) {
+  const navigate = useNavigate()
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+    <button
+      onClick={() => navigate("/post/1")}
+      className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm w-full text-left"
+    >
       <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl">
-        <img
-          src={thumbnail}
-          alt={title}
-          className="h-full w-full object-cover"
-        />
+        <img src={thumbnail} alt={title} className="h-full w-full object-cover" />
         {isNew && (
-          <div className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 rounded-full border-2 border-white bg-blue-500" />
+          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-600 opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-600" />
+          </span>
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-0.5">
           {isNew && (
             <Badge
               variant="secondary"
-              className="h-4 border-none bg-blue-50 px-1.5 text-[10px] text-blue-600"
+              className="h-4 border-none bg-blue-50 px-1.5 text-[10px] text-blue-600 font-bold uppercase"
             >
-              NOVO
+              Novo
             </Badge>
           )}
           {isStarred && <Star size={12} className="fill-amber-400 text-amber-400" />}
@@ -194,7 +187,7 @@ function RecentPost({
         </p>
       </div>
       <ChevronRight size={20} className="flex-shrink-0 text-slate-300" />
-    </div>
+    </button>
   )
 }
 
@@ -203,41 +196,40 @@ function RecentPost({
 /* -------------------------------------------------------------------------- */
 function PostSkeleton() {
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+    <div className="flex items-center gap-4 rounded-2xl border border-dashed border-slate-200 p-3 opacity-60">
       <Skeleton className="h-16 w-16 flex-shrink-0 rounded-xl" />
       <div className="flex-1 space-y-2">
-        <Skeleton className="h-3 w-24" />
-        <Skeleton className="h-4 w-40" />
-        <Skeleton className="h-3 w-32" />
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
       </div>
     </div>
   )
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Secao de Posts Recentes                                                    */
+/*  Seção de Posts Recentes                                                    */
 /* -------------------------------------------------------------------------- */
 function RecentPostsSection() {
   return (
-    <div className="space-y-3 px-5 pt-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-slate-800">Posts Recentes</h2>
-        <button className="text-sm font-semibold text-blue-600">Ver tudo</button>
+    <div className="space-y-3 px-4 pb-4">
+      <div className="flex items-center justify-between pt-1">
+        <h2 className="text-xl font-bold tracking-tight text-slate-800">Posts Recentes</h2>
+        <button className="text-sm font-medium text-blue-600">Ver tudo</button>
       </div>
-
       <div className="space-y-3">
         <RecentPost
-          title="A Forca na Fraqueza"
-          reference="2 Corintios 12:9"
-          category="Reflexao Diaria"
-          date="Ha 2 horas"
+          title="A Força na Fraqueza"
+          reference="2 Coríntios 12:9"
+          category="Reflexão Diária"
+          date="Há 2 horas"
           thumbnail={THUMB_BIBLE}
           isNew
         />
         <RecentPost
-          title="O Proposito no Deserto"
-          reference="Exodo 3:1-10"
-          category="Serie Moises"
+          title="O Propósito no Deserto"
+          reference="Êxodo 3:1-10"
+          category="Série Moisés"
           date="Ontem"
           thumbnail={THUMB_PRAY}
           isStarred
@@ -249,23 +241,23 @@ function RecentPostsSection() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  CTA Chat Biblico                                                           */
+/*  CTA Chat Bíblico                                                           */
 /* -------------------------------------------------------------------------- */
 function ChatCTA() {
+  const navigate = useNavigate()
   return (
-    <div className="px-5 pt-6 pb-4">
-      <div className="rounded-3xl bg-blue-600 p-6 text-white shadow-lg">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <h3 className="text-lg font-bold">Chat Biblico com IA</h3>
-            <p className="text-sm text-blue-100">
-              Tire duvidas sobre a palavra agora.
-            </p>
+    <div className="px-4 pb-6">
+      <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-5 text-white shadow-lg">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h3 className="text-lg font-bold">Chat Bíblico com IA</h3>
+            <p className="text-sm text-blue-100">Tire dúvidas sobre a palavra agora.</p>
           </div>
           <MessageSquare size={28} className="text-blue-200" />
         </div>
         <Button
-          className="mt-4 w-full rounded-xl border-2 border-white bg-white text-blue-600 font-semibold hover:bg-blue-50"
+          onClick={() => navigate("/chat")}
+          className="w-full bg-white text-blue-600 font-bold rounded-lg text-sm hover:bg-slate-50"
         >
           Iniciar Conversa
         </Button>
@@ -275,56 +267,22 @@ function ChatCTA() {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Bottom Navigation                                                          */
-/* -------------------------------------------------------------------------- */
-interface NavItemProps {
-  icon: React.ReactNode
-  label: string
-  active?: boolean
-}
-
-function NavItem({ icon, label, active }: NavItemProps) {
-  return (
-    <button
-      className={`flex flex-1 flex-col items-center gap-1 py-2 text-xs font-medium transition-colors ${
-        active ? "text-blue-600" : "text-slate-400"
-      }`}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  )
-}
-
-function BottomNavigation() {
-  return (
-    <nav className="sticky bottom-0 z-50 flex items-center border-t border-slate-100 bg-white/95 backdrop-blur-sm px-2 pb-safe">
-      <NavItem icon={<HomeIcon size={22} />} label="Inicio" active />
-      <NavItem icon={<MessageSquare size={22} />} label="Chat" />
-      <NavItem icon={<Bookmark size={22} />} label="Salvos" />
-      <NavItem icon={<Settings size={22} />} label="Admin" />
-    </nav>
-  )
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Pagina Home                                                                */
+/*  Página Home                                                                */
 /* -------------------------------------------------------------------------- */
 export function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <Topbar />
 
-      {/* Conteudo scrollavel */}
-      <main className="flex-1 overflow-y-auto pb-20">
-        <SearchBar />
+      <main className="flex-1 overflow-y-auto pb-4 max-w-2xl mx-auto w-full">
         <HeroCard />
-        <AudioBanner />
         <RecentPostsSection />
         <ChatCTA />
       </main>
 
-      <BottomNavigation />
+      <div className="max-w-2xl mx-auto w-full">
+        <BottomNavigation />
+      </div>
     </div>
   )
 }

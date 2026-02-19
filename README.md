@@ -38,7 +38,14 @@ Isso nao foi apenas uma reescrita — foi uma migracao deliberada para dominar u
 - ♿ **Acessivel por padrao** — Construido sobre primitivos Radix UI (compativel com WAI-ARIA), HTML semantico, navegacao por teclado e gerenciamento de foco
 - 📱 **Design responsivo** — Abordagem mobile-first com classes utilitarias do Tailwind
 - 🎨 **Design system** — Biblioteca de componentes `vida-com-deus-ui` com variantes CVA e composicao de classes via `cn()`
-- 🔐 **UI de Login** — Tela de autenticacao completa com email/senha, login social (Google e Apple) e toggle de visibilidade de senha
+- 🔐 **Fluxo de autenticacao** — Login, Cadastro e Recuperacao de senha com login social (Google e Apple)
+- 🌐 **Navegacao client-side** — React Router com 10 rotas declaradas em `App.tsx`
+- 🏠 **Home** — Feed do dia com hero card, posts recentes, skeleton loader e CTA de chat
+- 📖 **Post Detail** — Leitura de post com player de audio, tabs de conteudo (IA, Tags, Devocional) e FAB de chat
+- 💬 **Chat Biblico com IA** — Interface de mensagens com citacoes biblicas expansiveis e sugestoes de perguntas
+- 📚 **Biblioteca** — Favoritos e historico com busca, filtros e estado vazio
+- ⚙️ **Configuracoes** — Perfil do usuario, seletor de tema e toggles de IA e notificacoes
+- 🖥️ **Admin Monitor** — Painel de monitoramento do banco de dados com grafico, ETL e alertas
 - 🧩 **Componentes polimorficos** — Padrao `asChild` via Radix Slot para renderizacao flexivel
 - ⚡ **Props type-safe** — Todos os componentes estendem atributos nativos de elementos HTML com IntelliSense completo
 
@@ -50,6 +57,7 @@ Isso nao foi apenas uma reescrita — foi uma migracao deliberada para dominar u
 <tr><td><strong>Categoria</strong></td><td><strong>Tecnologia</strong></td></tr>
 <tr><td>Framework</td><td>React 19 + TypeScript 5.9</td></tr>
 <tr><td>Build Tool</td><td>Vite 7</td></tr>
+<tr><td>Roteamento</td><td>React Router DOM v7</td></tr>
 <tr><td>Estilizacao</td><td>Tailwind CSS v4 + PostCSS</td></tr>
 <tr><td>Primitivos UI</td><td>Radix UI + shadcn/ui</td></tr>
 <tr><td>Variantes de Componentes</td><td>Class Variance Authority (CVA)</td></tr>
@@ -74,52 +82,57 @@ vida-com-deus-IA/
 │   │   └── react.svg
 │   ├── components/
 │   │   ├── auth/
-│   │   │   └── LoginForm.tsx        # ✅ Implementado
-│   │   ├── ui/                      # Componentes base (de vida-com-deus-ui)
-│   │   │   ├── button.tsx
-│   │   │   ├── card.tsx
-│   │   │   ├── input.tsx
-│   │   │   └── separator.tsx
-│   │   ├── admin/                   # 🔜 Planejado
-│   │   ├── chat/                    # 🔜 Planejado
-│   │   ├── layout/                  # 🔜 Planejado
-│   │   └── post/                    # 🔜 Planejado
-│   ├── hooks/                       # 🔜 Planejado
+│   │   │   └── LoginForm.tsx           # ✅ Implementado
+│   │   └── layout/                     # ✅ Implementado
+│   │       ├── BottomNavigation.tsx    #    Nav inferior (Home/Chat/Biblioteca/Admin)
+│   │       └── SecondaryTopbar.tsx     #    Topbar com botao voltar
+│   ├── hooks/                          # 🔜 Planejado
 │   ├── lib/
-│   │   └── utils.ts                 # Utilitario cn()
+│   │   └── utils.ts                    # Utilitario cn()
 │   ├── pages/
-│   │   └── Login.tsx                # ✅ Implementado
-│   ├── App.tsx                      # Componente raiz
+│   │   ├── LandingPage.tsx             # ✅ Implementado — pagina publica de marketing
+│   │   ├── Login.tsx                   # ✅ Implementado — autenticacao
+│   │   ├── SignUp.tsx                  # ✅ Implementado — cadastro
+│   │   ├── PasswordRecovery.tsx        # ✅ Implementado — recuperacao de senha
+│   │   ├── Home.tsx                    # ✅ Implementado — feed do dia
+│   │   ├── PostDetail.tsx              # ✅ Implementado — leitura com player e tabs
+│   │   ├── BiblicalAIChat.tsx          # ✅ Implementado — chat biblico com IA
+│   │   ├── Favorites.tsx               # ✅ Implementado — biblioteca/favoritos
+│   │   ├── AccountSettings.tsx         # ✅ Implementado — configuracoes do usuario
+│   │   └── AdminDatabaseMonitor.tsx    # ✅ Implementado — painel admin
+│   ├── App.tsx                         # BrowserRouter + Routes (10 rotas)
 │   ├── App.css
-│   ├── index.css                    # Variaveis de tema Tailwind v4
-│   └── main.tsx                     # Entry point React 19
+│   ├── index.css                       # Variaveis de tema Tailwind v4
+│   └── main.tsx                        # Entry point React 19
 │
-├── vida-com-deus-ui/                # Biblioteca local de componentes
+├── vida-com-deus-ui/                   # Biblioteca local de componentes UI
 │   └── src/
 │       ├── components/
-│       │   ├── auth/                # 🔜 Planejado
-│       │   └── ui/                  # Button, Card, Input, Separator
+│       │   └── ui/                     # Todos os componentes base
+│       │       ├── badge.tsx
 │       │       ├── button.tsx
 │       │       ├── card.tsx
 │       │       ├── input.tsx
-│       │       └── separator.tsx
+│       │       ├── separator.tsx
+│       │       └── skeleton.tsx
 │       ├── lib/
-│       │   └── utils.ts             # Utilitario cn() compartilhado
-│       └── index.ts                 # Barrel exports
+│       │   └── utils.ts                # Utilitario cn() compartilhado
+│       └── index.ts                    # Barrel exports
 │
 ├── docs/
-│   ├── etapas.md                    # Etapas concluidas
-│   └── registro-features.md        # Template de registro de features
+│   ├── designer/                       # Designs de referencia (18 telas)
+│   │   ├── home_-_post_do_dia_1/      #   screen.png + code.html por tela
+│   │   └── ...
+│   ├── etapas.md                       # Historico de etapas concluidas
+│   └── registro-features.md           # Registro formal de features
 │
-├── index.html                       # Entry point HTML
-├── vite.config.ts                   # Configuracao Vite + alias @/*
-├── tailwind.config.js               # Configuracao Tailwind CSS
-├── postcss.config.js                # Plugin @tailwindcss/postcss
-├── tsconfig.json                    # TypeScript raiz
-├── tsconfig.app.json                # TypeScript app (strict)
-├── tsconfig.node.json               # TypeScript node
-├── eslint.config.js                 # ESLint 9 flat config
-├── components.json                  # Configuracao shadcn/ui
+├── index.html                          # Entry point HTML
+├── vite.config.ts                      # Configuracao Vite + alias @/*
+├── postcss.config.js                   # Plugin @tailwindcss/postcss
+├── tsconfig.json                       # TypeScript raiz
+├── tsconfig.app.json                   # TypeScript app (strict)
+├── tsconfig.node.json                  # TypeScript node
+├── eslint.config.js                    # ESLint 9 flat config
 └── package.json
 ```
 
@@ -148,6 +161,72 @@ Todas as cores sao definidas como custom properties CSS em HSL, com escopo em `:
 ```
 
 Os componentes consomem essas variaveis via classes do Tailwind como `bg-background`, `text-foreground`, etc. — permitindo trocar de tema com um unico toggle de classe.
+
+---
+
+## 🤖 Desenvolvimento Assistido por IA (Claude Code)
+
+Uma parte relevante deste projeto foi desenvolvida com o auxilio do **Claude Code** — a CLI oficial da Anthropic para desenvolvimento assistido por IA. Mais do que usar IA para gerar codigo, o objetivo foi **projetar o processo** para obter resultados consistentes, revistaveis e alinhados ao design system.
+
+### O Agente `design-implementer`
+
+Para converter os 18 designs (HTML + PNG em `docs/designer/`) em componentes React, criei um **agente customizado** em `.claude/agents/design-implementer.md`. O agente define um contrato de trabalho com **3 fases obrigatorias** — o modelo nao pode pular etapas:
+
+```text
+Fase 1 — Revisao do Design
+  1.1 Inventario de elementos (textos, icones, botoes, cards, inputs...)
+  1.2 Hierarquia visual (o que o olho ve primeiro, segundo, terceiro)
+  1.3 Estados e interacoes visiveis (hover, ativo, loading, vazio)
+  1.4 Mapeamento de componentes (qual componente da lib usar, qual pasta)
+  1.5 Ambiguidades e como resolve-las
+
+Fase 2 — Implementacao
+  - Verificar existencia de componentes na lib antes de assumir
+  - Criar na lib se necessario, exportar no barrel, rebuildar
+  - Implementar seguindo os padroes da skill react-ui-patterns
+  - npm run build deve passar sem erros antes de continuar
+
+Fase 3 — Revisao do Codigo
+  - Checklist de fidelidade ao design
+  - Checklist de padroes do projeto
+  - Checklist de qualidade de codigo (aria-label, tipagem, sem any)
+```
+
+### A Skill `react-ui-patterns`
+
+Alem do agente, criei uma **skill reutilizavel** em `.claude/skills/react-ui-patterns/SKILL.md` que injeta contexto tecnico especifico do projeto em cada chamada:
+
+- **Tokens de cor obrigatorios** — `bg-slate-50`, `blue-600`, `text-slate-800`, etc.
+- **Espacamentos e bordas** — `px-5` lateral, `rounded-2xl` em cards, `shadow-sm`
+- **Esqueleto de pagina padrao** — `Topbar + main + BottomNavigation`
+- **Regras de import** — nunca de `@/components/ui/`, sempre de `vida-com-deus-ui`
+- **Padroes de sub-componentes** — cada secao visual distinta = funcao separada no arquivo
+
+Essa skill e referenciada no front matter do agente (`skills: react-ui-patterns`) e carregada automaticamente em cada sessao de implementacao.
+
+### Engenharia de Prompt — Decisoes Tecnicas
+
+Algumas escolhas intencionais no design do agente:
+
+| Decisao                                   | Motivo                                                                                                           |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Fase de inventario obrigatoria**        | Evita que o modelo comece a codar antes de entender o design completo, reduzindo retrabalho                      |
+| **Checklist de revisao com `[ ]`**        | Formato markdown que o modelo processa como itens verificaveis, nao como texto livre                             |
+| **Skill separada do agente**              | Permite reutilizar os tokens visuais em outros agentes futuros sem duplicacao                                    |
+| **`npm run build` obrigatorio na Fase 2** | Garante zero erros TypeScript antes de continuar — o modelo nao pode entregar com build quebrado                 |
+| **Fase de ambiguidades (1.5)**            | Forca o modelo a documentar cada decisao subjetiva (ex: qual icone do lucide-react substitui um Material Symbol) |
+
+### Resultado Pratico
+
+Com esse workflow, **18 telas de design foram convertidas em 10 paginas React TypeScript em uma unica sessao**, com:
+
+- Build limpo (`0 erros TypeScript`, bundle de 330 kB)
+- Todos os componentes base vindos de `vida-com-deus-ui`
+- Navegacao funcional entre todas as rotas via React Router
+- Padroes visuais consistentes em todas as telas (cores, espacamentos, bordas)
+- Estados interativos implementados (tabs, toggles, busca, estado vazio, loading)
+
+> O diferencial nao e so usar IA — e **projetar o processo** para que a IA produza resultados previsíveis, revisaveis e alinhados ao design system. Isso e o que separa "gerar codigo com IA" de "engenharia assistida por IA".
 
 <!-- ---
 
@@ -225,12 +304,13 @@ Usar primitivos do Radix UI significa que cada componente interativo ja vem com 
 - [x] Tela de login com componentes shadcn/ui
 - [x] Biblioteca UI local (`vida-com-deus-ui`)
 - [x] Migracao para Tailwind CSS v4
-- [ ] Fluxo de autenticacao (integracao com backend)
-- [ ] Componentes de layout (Sidebar, Topbar, MobileNav)
-- [ ] Sistema de posts com painel de IA
-- [ ] Chat com badges de citacao
-- [ ] Dashboard administrativo
-- [ ] Toggle de dark mode na UI
+- [x] Roteamento client-side com React Router DOM v7
+- [x] Componentes de layout compartilhados (BottomNavigation, SecondaryTopbar)
+- [x] Implementacao de todos os layouts de tela (10 paginas)
+- [ ] Fluxo de autenticacao real (integracao com backend)
+- [ ] Integracao com API de posts e feed dinamico
+- [ ] Chat biblico com IA (integracao com backend RAG)
+- [ ] Toggle de dark mode funcional na UI
 - [ ] Publicar `vida-com-deus-ui` no npm
 
 --- -->

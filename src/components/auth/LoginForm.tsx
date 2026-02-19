@@ -1,10 +1,12 @@
 import { useState } from "react"
 import { Apple, Church, Eye, EyeOff, Chrome } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 
 import { Button, Card, CardContent, CardFooter, CardHeader, Input, Separator } from "vida-com-deus-ui"
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
+  const navigate = useNavigate()
 
   return (
     <Card className="w-full max-w-[420px] rounded-2xl border-slate-200/70 shadow-sm">
@@ -38,6 +40,7 @@ export function LoginForm() {
             </label>
             <button
               type="button"
+              onClick={() => navigate("/recuperar-senha")}
               className="text-sm font-medium text-primary hover:underline"
             >
               Esqueceu a senha?
@@ -60,7 +63,7 @@ export function LoginForm() {
             </button>
           </div>
         </div>
-        <Button className="w-full text-base">Entrar</Button>
+        <Button className="w-full text-base" onClick={() => navigate("/")}>Entrar</Button>
         <div className="relative py-2">
           <Separator />
           <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-3 text-[11px] font-medium tracking-widest text-muted-foreground">
@@ -80,7 +83,11 @@ export function LoginForm() {
       </CardContent>
       <CardFooter className="justify-center text-sm text-muted-foreground">
         <span>Não tem uma conta?</span>
-        <button type="button" className="ml-1 font-medium text-primary hover:underline">
+        <button
+          type="button"
+          onClick={() => navigate("/cadastro")}
+          className="ml-1 font-medium text-primary hover:underline"
+        >
           Criar conta agora
         </button>
       </CardFooter>

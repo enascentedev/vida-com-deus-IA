@@ -161,3 +161,152 @@ Testes:
 Referencias:
 
 - Sem referencias.
+
+---
+
+### [Data: 2026-02-19] — Navegacao com React Router
+
+Motivo da Criacao:
+
+- O app nao possuia sistema de navegacao entre telas. Com a criacao de multiplas
+  paginas, era necessario um roteador client-side para gerenciar transicoes de
+  URL e historico de navegacao.
+
+Escopo:
+
+- App principal (`src/App.tsx`, `package.json`).
+
+Impacto:
+
+- `App.tsx` passou de renderizacao direta de `<Home />` para um `<BrowserRouter>`
+  com `<Routes>` declarando todas as rotas do app.
+- Instalado `react-router-dom` como dependencia de producao.
+- Todos os componentes que precisam de navegacao passaram a usar `useNavigate`
+  e `useLocation` do react-router-dom.
+
+Riscos:
+
+- Em modo de producao com servidor estatico, rotas que nao sejam `/` podem
+  retornar 404 se o servidor nao estiver configurado para redirecionar ao
+  `index.html`. Requer configuracao de fallback no servidor de deploy.
+
+Migracao:
+
+- Instalar dependencia: `npm install react-router-dom`.
+- Envolver o app com `<BrowserRouter>` em `App.tsx`.
+- Substituir renderizacao direta de paginas por `<Routes>/<Route>`.
+
+Testes:
+
+- `npm run build` sem erros de TypeScript.
+- Navegar entre rotas verificando que cada pagina carrega corretamente.
+
+Referencias:
+
+- Sem referencias.
+
+---
+
+### [Data: 2026-02-19] — Componentes de Layout Compartilhados
+
+Motivo da Criacao:
+
+- `Home.tsx` definia `BottomNavigation` internamente. Com multiplas paginas
+  precisando da mesma navegacao inferior e de uma topbar com botao voltar,
+  era necessario extrair esses elementos para componentes reutilizaveis.
+
+Escopo:
+
+- App principal (`src/components/layout/`).
+
+Impacto:
+
+- Criados dois novos componentes de layout:
+  - `BottomNavigation`: nav inferior com 4 abas (Inicio, Chat, Biblioteca, Admin),
+    detecta automaticamente a aba ativa via `useLocation`.
+  - `SecondaryTopbar`: barra superior com botao voltar (`ChevronLeft`), titulo
+    centralizado e slot opcional para acoes a direita.
+- `Home.tsx` refatorado para usar `BottomNavigation` importado.
+- Todas as paginas internas usam `SecondaryTopbar` em vez de topbar proprio.
+
+Riscos:
+
+- `BottomNavigation` usa `useLocation`, portanto deve ser renderizado dentro
+  de um contexto `<BrowserRouter>`. Nao pode ser usado fora do roteador.
+
+Migracao:
+
+- Sem migracao para usuarios finais.
+- Novos componentes criados em `src/components/layout/BottomNavigation.tsx`
+  e `src/components/layout/SecondaryTopbar.tsx`.
+
+Testes:
+
+- Navegar entre as abas e verificar que o item ativo e destacado corretamente.
+- Pressionar botao voltar no `SecondaryTopbar` e verificar navegacao correta.
+
+Referencias:
+
+- Sem referencias.
+
+---
+
+### [Data: 2026-02-19] — Implementacao dos Layouts de Telas
+
+Motivo da Criacao:
+
+- O projeto possuia apenas Home e Login implementadas. Com os designs aprovados
+  em `docs/designer/`, era necessario implementar todas as telas do app para
+  ter uma base navegavel e fiel ao visual definido.
+
+Escopo:
+
+- App principal (`src/pages/`, `src/components/auth/`).
+
+Impacto:
+
+- Criadas 8 novas paginas baseadas nos designs em `docs/designer/`:
+  - `LandingPage` — pagina de marketing publica com hero, "Como funciona",
+    CTA e footer.
+  - `SignUp` — formulario de cadastro com nome, email, senha, confirmacao,
+    termos e botoes sociais (Google, Apple).
+  - `PasswordRecovery` — recuperacao de senha com campo de email, botao de
+    envio e banner de sucesso interativo.
+  - `PostDetail` — detalhe do post com player de audio, versículo destacado,
+    tabs (Resumo/Tags/Devocional) e FAB de chat com IA.
+  - `BiblicalAIChat` — interface de chat com bolhas de usuario e IA, citacoes
+    biblicas expansiveis, chips de sugestao e campo de input.
+  - `Favorites` — biblioteca com abas Favoritos/Historico, busca, chips de
+    filtro, lista de items e estado vazio.
+  - `AccountSettings` — configuracoes com perfil, seletor de tema
+    (Light/Dark/System) e toggles de IA e notificacoes.
+  - `AdminDatabaseMonitor` — painel admin com card de capacidade de
+    armazenamento, grafico SVG de crescimento, tabela ETL e alertas.
+- `LoginForm` atualizado com navegacao funcional para `/cadastro` e
+  `/recuperar-senha`.
+- `Home.tsx` refatorado com navegacao para `/post/:id` e `/chat`.
+
+Riscos:
+
+- As paginas contem dados estaticos (mock). Integracao com API real pode
+  requerer ajustes nos tipos de props e estados.
+- O grafico SVG em `AdminDatabaseMonitor` e estatico; uma solucao dinamica
+  exigira biblioteca de graficos (ex.: Recharts).
+
+Migracao:
+
+- Sem migracao.
+- Novos arquivos em `src/pages/`: `LandingPage.tsx`, `SignUp.tsx`,
+  `PasswordRecovery.tsx`, `PostDetail.tsx`, `BiblicalAIChat.tsx`,
+  `Favorites.tsx`, `AccountSettings.tsx`, `AdminDatabaseMonitor.tsx`.
+
+Testes:
+
+- `npm run build` sem erros de TypeScript (validado: build limpo, 330kB).
+- Navegar por cada rota e verificar fidelidade ao design em `docs/designer/`.
+- Testar estados interativos: tabs em PostDetail, toggles em AccountSettings,
+  busca em Favorites, estado de sucesso em PasswordRecovery.
+
+Referencias:
+
+- Designs de referencia: `docs/designer/` (18 subpastas com `screen.png` e `code.html`).
