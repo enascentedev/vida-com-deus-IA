@@ -127,6 +127,34 @@ Todos os layouts foram implementados com base nos designs em `docs/designer/`
 - `npm run build` limpo: 0 erros de TypeScript, bundle de 330kB.
 - Todas as 10 rotas funcionais e navegaveis.
 
+## Etapa 7 — Script de Capturas de Tela (Playwright)
+
+### Objetivo
+
+Criar um script automatizado para capturar screenshots de todas as rotas da aplicacao
+em dois viewports (desktop e mobile iPhone 11), organizando as imagens por data e hora
+da execucao.
+
+### O que foi feito
+
+- Instalado `playwright` (Python) e browser Chromium via `python -m playwright install chromium`.
+- Criado `scripts/screenshot-routes.py` com as seguintes caracteristicas:
+  - Captura todas as 10 rotas definidas em `App.tsx`.
+  - Viewport **desktop**: 1280×800px, `full_page=True`.
+  - Viewport **mobile iPhone 11**: 390×844px, DPR 2×, user-agent mobile e flags `is_mobile`/`has_touch`.
+  - Diretorio de saida: `screenshots/{YYYY-MM-DD_HH-MM-SS}/desktop/` e `.../mobile-iphone11/`.
+  - O timestamp e gerado no inicio da execucao, antes de qualquer captura.
+- Execucao via helper `with_server.py` (skill webapp-testing) que gerencia o ciclo de vida do Vite:
+  ```bash
+  python with_server.py --server "npm run dev" --port 5173 -- python scripts/screenshot-routes.py
+  ```
+- Total de imagens por execucao: **20** (10 rotas × 2 viewports).
+
+### Rotas capturadas
+
+`/landing`, `/login`, `/cadastro`, `/recuperar-senha`, `/`, `/post/1`,
+`/chat`, `/biblioteca`, `/configuracoes`, `/admin`.
+
 ## Documentacao
 
 1. [Registro de Features](./registro-features.md)

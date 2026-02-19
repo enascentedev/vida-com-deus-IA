@@ -310,3 +310,47 @@ Testes:
 Referencias:
 
 - Designs de referencia: `docs/designer/` (18 subpastas com `screen.png` e `code.html`).
+
+---
+
+### [Data: 2026-02-19] — Script de Capturas de Tela (Playwright)
+
+Motivo da Criacao:
+
+- Necessidade de documentar visualmente o estado atual de cada tela da aplicacao
+  em diferentes viewports, facilitando revisoes de design, deteccao de regressoes
+  visuais e comunicacao de progresso com stakeholders.
+
+Escopo:
+
+- Infraestrutura de testes e scripts (`scripts/screenshot-routes.py`).
+
+Impacto:
+
+- Gerada a pasta `screenshots/` (ignorada pelo git) contendo subpastas nomeadas
+  com o timestamp de cada execucao.
+- Cada execucao produz 20 imagens: 10 rotas × 2 viewports (desktop 1280×800 e
+  mobile iPhone 11 390×844 DPR 2×).
+- Nao afeta o bundle de producao nem o codigo da aplicacao.
+
+Riscos:
+
+- Requer `playwright` e Chromium instalados localmente (`pip install playwright &&
+  python -m playwright install chromium`).
+- A rota `/post/:id` e capturada com id `1` (dado estatico); quando houver dados
+  reais, o id devera ser ajustado no script.
+
+Migracao:
+
+- Instalar dependencia Python: `pip install playwright`.
+- Instalar browser: `python -m playwright install chromium`.
+- Executar com: `python with_server.py --server "npm run dev" --port 5173 -- python scripts/screenshot-routes.py`.
+
+Testes:
+
+- Verificar que o diretorio `screenshots/{timestamp}/desktop/` e `.../mobile-iphone11/`
+  contem 10 arquivos `.png` cada apos a execucao.
+
+Referencias:
+
+- Sem referencias.
