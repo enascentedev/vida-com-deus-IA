@@ -1,9 +1,13 @@
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { ChevronLeft, BookOpen, Plus, Send, ChevronUp } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
 const AVATAR_URL =
   "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80"
+
+const API_BASE = "http://localhost:8000/v1"
+// Fase 1: conversa mock fixa. Fase 2: criar conversa dinamicamente via POST /conversations.
+const CONV_ID = "conv-001"
 
 /* -------------------------------------------------------------------------- */
 /*  Tipos                                                                      */
@@ -147,40 +151,99 @@ const SUGGESTIONS = [
 ]
 
 /* -------------------------------------------------------------------------- */
+/*  Utilitário: converte mensagem da API para tipo local                       */
+/* -------------------------------------------------------------------------- */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function apiMsgToLocal(m: any, id: number): Message {
+  return {
+    id,
+    type: m.role === "user" ? "user" : "ai",
+    text: m.content,
+    citations: (m.citations ?? []).map((c: { reference: string }) => ({
+      reference: c.reference,
+    })),
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Página BiblicalAIChat                                                      */
 /* -------------------------------------------------------------------------- */
-const INITIAL_MESSAGES: Message[] = [
-  {
-    id: 1,
-    type: "user",
-    text: "O que a Bíblia diz sobre superar a ansiedade em tempos difíceis?",
-  },
-  {
-    id: 2,
-    type: "ai",
-    text: "A Bíblia oferece um conforto profundo para a ansiedade. Ela nos orienta a entregar nossas preocupações a Deus, confiando em Sua soberania e cuidado constante. O apóstolo Paulo nos ensina a substituir a preocupação pela oração e gratidão.",
-    citations: [
-      { reference: "Filipenses 4:6-7" },
-      { reference: "1 Pedro 5:7" },
-      { reference: "Mateus 6:34" },
-    ],
-  },
-  {
-    id: 3,
-    type: "ai",
-    text: "",
-    loading: true,
-  },
-]
-
 export function BiblicalAIChat() {
   const navigate = useNavigate()
-  const [messages] = useState<Message[]>(INITIAL_MESSAGES)
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
 
-  function handleSend() {
-    if (!input.trim()) return
+  // Carrega histórico ao montar
+  useEffect(() => {
+    fetch(`${API_BASE}/chat/conversations/${CONV_ID}/messages`)
+      .then((res) => res.json())
+      .then((data) => {
+        const loaded: Message[] = data.messages.map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (m: any, i: number) => apiMsgToLocal(m, i + 1),
+        )
+        setMessages(loaded)
+      })
+      .catch(() => {
+        // Back-end não disponível — começa com estado vazio
+      })
+  }, [])
+
+  // Rola para o fim sempre que mensagens mudam
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  async function handleSend() {
+    const text = input.trim()
+    if (!text || isLoading) return
+
     setInput("")
+
+    const baseId = Date.now()
+
+    // Adiciona mensagem do usuário e indicador de loading
+    setMessages((prev) => [
+      ...prev,
+      { id: baseId, type: "user", text },
+      { id: baseId + 1, type: "ai", text: "", loading: true },
+    ])
+    setIsLoading(true)
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/chat/conversations/${CONV_ID}/messages`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: text }),
+        },
+      )
+
+      if (!res.ok) throw new Error("Erro na resposta da API")
+
+      const data = await res.json()
+      const aiMsg = apiMsgToLocal(data.assistant_message, baseId + 2)
+
+      // Substitui o loading pela resposta real
+      setMessages((prev) =>
+        prev.filter((m) => m.id !== baseId + 1).concat(aiMsg),
+      )
+    } catch {
+      // Substitui o loading por mensagem de erro amigável
+      setMessages((prev) =>
+        prev.filter((m) => m.id !== baseId + 1).concat({
+          id: baseId + 2,
+          type: "ai",
+          text: "Não foi possível me conectar ao servidor. Verifique se o back-end está rodando em localhost:8000.",
+          citations: [],
+        }),
+      )
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -239,6 +302,9 @@ export function BiblicalAIChat() {
             )
           )}
         </div>
+
+        {/* Âncora de scroll */}
+        <div ref={bottomRef} />
       </main>
 
       {/* Input */}
@@ -268,13 +334,15 @@ export function BiblicalAIChat() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-2 placeholder-slate-400 outline-none"
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+              disabled={isLoading}
+              className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-2 placeholder-slate-400 outline-none disabled:opacity-50"
               placeholder="Digite sua dúvida bíblica..."
             />
             <button
               onClick={handleSend}
-              className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/30 active:scale-95 transition-all duration-200"
+              disabled={isLoading || !input.trim()}
+              className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-600/20 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-600/30 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Enviar mensagem"
             >
               <Send size={18} />

@@ -354,3 +354,90 @@ Testes:
 Referencias:
 
 - Sem referencias.
+
+---
+
+### [Data: 2026-02-20] — Reorganizacao em Monorepo (PR #2)
+
+Motivo da Criacao:
+
+- O projeto cresceu e passou a ter front-end e back-end. Manter ambos na raiz
+  dificultaria CI/CD independente e a separacao de responsabilidades. A organizacao
+  em monorepo diretorizado permite pipelines e configuracoes isoladas por camada.
+
+Escopo:
+
+- Estrutura de diretorios do repositorio (raiz → `front-end/`).
+
+Impacto:
+
+- Todos os arquivos do front-end foram movidos para `front-end/`.
+- Raiz do repositorio passou a conter apenas `front-end/`, `back-end/` e arquivos
+  globais (`README.md`, `.gitignore`).
+- Scripts, documentacao e configs do front-end passaram a residir sob `front-end/`.
+
+Riscos:
+
+- Paths relativos em scripts e configs precisavam ser revisados apos a movimentacao.
+- Ferramentas que assumem a raiz como base (ex.: Vite, tsconfig) continuam corretas
+  pois sao executadas a partir de `front-end/`.
+
+Migracao:
+
+- Executar comandos do front-end a partir de `front-end/` (ex.: `cd front-end && npm run dev`).
+- Atualizar qualquer script externo que referencie caminhos da raiz.
+
+Testes:
+
+- `npm run dev` e `npm run build` a partir de `front-end/` sem erros.
+
+Referencias:
+
+- PR #2: Refactor — Reorganiza projeto em estrutura monorepo.
+
+---
+
+### [Data: 2026-02-20] — Estrutura Inicial do Back-End FastAPI (PR #3)
+
+Motivo da Criacao:
+
+- O front-end precisava de uma API real para substituir os dados mockados das paginas.
+  A Fase 1 estabelece o contrato de API (endpoints, schemas, autenticacao JWT) com
+  dados mockados, permitindo que o front-end integre antes do banco de dados estar pronto.
+
+Escopo:
+
+- Back-end (`back-end/`) — novo diretorio no monorepo.
+
+Impacto:
+
+- Criada estrutura completa do servidor FastAPI orientada a dominios:
+  auth, users, posts, library, chat, admin.
+- 40+ testes de contrato validam status HTTP e schemas de todos os endpoints.
+- Documentacao interativa disponivel em `http://localhost:8000/docs`.
+- Autenticacao JWT implementada (access token 15min, refresh token 7 dias).
+- CORS configurado para `localhost:5173` e `localhost:3000`.
+
+Riscos:
+
+- Fase 1 retorna dados mockados. Integracao real com PostgreSQL e Redis esta
+  planejada para Fase 2 e exigira migracao de schemas e configuracao de infraestrutura.
+- `JWT_SECRET_KEY` deve ser definida no `.env`; ausencia causa erro na inicializacao.
+
+Migracao:
+
+- Instalar `uv`: `pip install uv`.
+- Instalar dependencias: `uv sync` a partir de `back-end/`.
+- Copiar `.env.example` para `.env` e configurar `JWT_SECRET_KEY`.
+- Iniciar servidor: `uv run uvicorn app.main:app --reload`.
+
+Testes:
+
+- `pytest` — todos os testes de contrato devem passar.
+- `pytest --cov` — verificar cobertura dos endpoints.
+- Acessar `http://localhost:8000/docs` e validar documentacao gerada.
+
+Referencias:
+
+- PR #3: Feat — Estrutura inicial do back-end (FastAPI + dominios).
+- `back-end/arquitetura-back-end.md` — decisoes arquiteturais detalhadas.

@@ -1,6 +1,7 @@
 # Etapas executadas
 
 ## Etapa 1 — Bootstrap do projeto
+
 - Criado projeto Vite com React + TypeScript.
 - Instalado e configurado TailwindCSS (v3) com PostCSS e autoprefixer.
 - Ajustado `tailwind.config.js` com paths, tema (tokens CSS) e plugin `tailwindcss-animate`.
@@ -9,12 +10,14 @@
 - Adicionado `components.json` para o shadcn/ui.
 
 ## Etapa 2 — Componente de Login (shadcn)
+
 - Criado `LoginForm` com componentes `Button`, `Input`, `Card`, `Separator`.
 - Implementada página `Login` centralizada e responsiva.
 - Ajustes visuais alinhados ao mock (ícone, tipografia, espaçamentos, botões sociais).
 - Tela conectada no `App`.
 
 ## Etapa 3 — Biblioteca npm (abstração)
+
 - Criada biblioteca local `vida-com-deus-ui` dentro do workspace (pasta própria).
 - Componentes e utilitários extraídos para a lib (`Button`, `Input`, `Card`, `Separator`, `cn`).
 - Build configurado com `tsup` gerando `dist` (esm/cjs/dts).
@@ -22,11 +25,13 @@
 - `LoginForm` ficou no app e compõe os componentes da lib.
 
 ## Ajustes posteriores
+
 - Corrigido alias `@` no TypeScript e import do `LoginForm` para caminho relativo.
 - Configurados `tsconfig.app.json` e `tsconfig.node.json` com `composite` e emissão de tipos para project references.
 - Ajustado `InputProps` na lib para `type` em vez de interface vazia.
 
 ## Publicação
+
 - A biblioteca **não foi publicada** no npm.
 - Portanto, **não há conta** associada à publicação.
 
@@ -145,15 +150,89 @@ da execucao.
   - Diretorio de saida: `screenshots/{YYYY-MM-DD_HH-MM-SS}/desktop/` e `.../mobile-iphone11/`.
   - O timestamp e gerado no inicio da execucao, antes de qualquer captura.
 - Execucao via helper `with_server.py` (skill webapp-testing) que gerencia o ciclo de vida do Vite:
+
   ```bash
   python with_server.py --server "npm run dev" --port 5173 -- python scripts/screenshot-routes.py
   ```
+
 - Total de imagens por execucao: **20** (10 rotas × 2 viewports).
 
 ### Rotas capturadas
 
 `/landing`, `/login`, `/cadastro`, `/recuperar-senha`, `/`, `/post/1`,
 `/chat`, `/biblioteca`, `/configuracoes`, `/admin`.
+
+---
+
+## Etapa 8 — Reorganizacao em Monorepo (PR #2)
+
+### Contexto — Etapa 8
+
+- Branch: `feat/criacao-layout` → mergeado em `main` em 2026-02-20.
+
+### Mudancas realizadas — Etapa 8
+
+- Todos os arquivos do front-end (src/, docs/, scripts/, configs) foram movidos
+  da raiz do repositório para o diretório `front-end/`.
+- Criado `front-end/.gitignore` com padrões adequados para Vite + Tailwind + TypeScript.
+- Raiz do repositório ficou limpa, contendo apenas `front-end/`, `back-end/` e
+  arquivos globais (README, .gitignore raiz).
+
+### Motivacao — Etapa 8
+
+Separar front-end e back-end em diretórios dedicados para suportar estrutura
+monorepo e facilitar CI/CD independente por camada.
+
+### Commits do PR #2
+
+- `056b2ab` — ♻️ refactor: reorganiza projeto em monorepo com diretório front-end/
+- `0983e9f` — 🔥 refactor: remove arquivos da raiz movidos para front-end/ e adiciona .gitignore
+
+---
+
+## Etapa 9 — Estrutura Inicial do Back-End FastAPI (PR #3)
+
+### Contexto — Etapa 9
+
+- Branch: `feat/criacao-backend` → mergeado em `main` em 2026-02-20.
+
+### Implementacao — Etapa 9
+
+- Criado diretório `back-end/` com estrutura modular orientada a domínios:
+  - `app/main.py` — ponto de entrada FastAPI com CORS e health check.
+  - `app/api/router.py` — agrega todos os routers sob o prefixo `/v1`.
+  - `app/api/v1/` — routers por domínio: auth, users, posts, library, chat, admin.
+  - `app/core/` — config (Pydantic Settings), security (JWT), dependencies.
+  - `app/domain/` — schemas Pydantic por domínio.
+  - `tests/contract/` — 40+ testes de contrato cobrindo todos os endpoints.
+- Criado `back-end/.gitignore` com padrões Python (venv, `__pycache__`, .env).
+- Criado `back-end/README.md` com documentação completa da API.
+- Criado `back-end/arquitetura-back-end.md` com decisões arquiteturais detalhadas.
+- **Estado Fase 1:** todos os endpoints retornam dados mockados. Banco de dados
+  (PostgreSQL) e cache (Redis) planejados para Fase 2.
+
+### Tech Stack do back-end
+
+- FastAPI 0.115, Python 3.13, Pydantic v2, python-jose (JWT), pytest, uv.
+
+### Endpoints implementados
+
+| Domínio   | Prefixo                                                                       |
+| --------- | ----------------------------------------------------------------------------- |
+| Auth      | `POST /v1/auth/{signup,login,refresh,logout,forgot-password,reset-password}`  |
+| Usuário   | `GET/PATCH /v1/users/me`, `GET/PATCH /v1/users/me/settings`                  |
+| Posts     | `GET /v1/posts/feed`, `GET /v1/posts/{id}`, `GET /v1/posts/{id}/audio`       |
+| Biblioteca | `GET /v1/library/`, `POST/DELETE /v1/library/favorites/{id}`                |
+| Chat      | `POST/GET /v1/chat/conversations`, `POST/GET /v1/chat/conversations/{id}/messages` |
+| Admin     | `GET /v1/admin/metrics/storage`, `GET /v1/admin/alerts`, `POST /v1/admin/etl/runs/execute` |
+| Health    | `GET /health`                                                                 |
+
+### Commits do PR #3
+
+- `b8ac93d` — ✨ feat: estrutura inicial do back-end (FastAPI + domínios)
+- `1e9dfb7` — 🙈 chore: melhora .gitignore do back-end
+
+---
 
 ## Documentacao
 
