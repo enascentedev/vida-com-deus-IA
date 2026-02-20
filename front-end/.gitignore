@@ -1,0 +1,44 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+
+# Build output
+# Usando /dist (apenas raiz) para não ignorar vida-com-deus-ui/dist/
+# que é necessário pois é um pacote local (file:./vida-com-deus-ui)
+/dist
+dist-ssr
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment variables
+.env
+*.local
+
+# Test coverage
+coverage/
+
+# Sensitive / personal files
+.cursor
+.claude
+README-secreto.md
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+CLAUDE.md
