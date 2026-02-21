@@ -1,6 +1,6 @@
 """ETL de scraping para https://www.wgospel.com/tempoderefletir/
 
-Coleta reflexões diárias e salva em data/posts.json.
+Coleta reflexões diárias e persiste no banco de dados via PostRepository.
 
 Estrutura DOM da listagem (tema BeTheme/WordPress):
   div.post-item
@@ -12,13 +12,13 @@ Estrutura DOM da listagem (tema BeTheme/WordPress):
 """
 
 import re
-import uuid
 from datetime import datetime, timezone
 
 import httpx
 from bs4 import BeautifulSoup, Tag
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.storage import read_json, write_json
+from app.repositories.post_repository import PostRepository
 
 SOURCE_URL = "https://www.wgospel.com/tempoderefletir/"
 
@@ -168,13 +168,13 @@ def _scrape_post_detail(url: str, client: httpx.Client) -> dict:
     return result
 
 
-def scrape_reflexoes() -> dict:
-    """Faz scraping da listagem wgospel.com/tempoderefletir/ e de cada post individual.
+async def run_etl(db: AsyncSession) -> dict:
+    """Faz scraping da listagem wgospel.com/tempoderefletir/ e persiste no banco.
 
-    Salva os posts coletados em data/posts.json (merge com existentes).
     Retorna dict com status da execução.
     """
     started_at = _now_iso()
+    repo = PostRepository(db)
 
     with httpx.Client() as client:
         resp = _fetch(SOURCE_URL, client)
@@ -193,7 +193,8 @@ def scrape_reflexoes() -> dict:
         if not post_items:
             post_items = soup.select("[class*='post'][class*='type-post']")
 
-        posts: list[dict] = []
+        posts_collected = 0
+        new_posts = 0
 
         for item in post_items[:20]:
             if not isinstance(item, Tag):
@@ -226,7 +227,6 @@ def scrape_reflexoes() -> dict:
                     thumbnail_url = "https://www.wgospel.com" + thumbnail_url
 
             reference, verse_snippet = _parse_excerpt_reference(excerpt_text)
-            post_id = f"post-{uuid.uuid5(uuid.NAMESPACE_URL, str(href)).hex[:8]}"
 
             detail = _scrape_post_detail(str(href), client)
 
@@ -238,52 +238,37 @@ def scrape_reflexoes() -> dict:
             ai_summary = first_paragraph
             meditation = body_text or "Reflita sobre esta passagem ao longo do dia."
 
-            key_points: list[str] = []
-            if body_text:
-                sentences = re.split(r"(?<=[.!?])\s+", body_text)
-                key_points = [s for s in sentences[:5] if 20 < len(s) < 200][:3]
-
-            posts.append({
-                "id": post_id,
+            post_data = {
                 "title": title,
                 "reference": reference,
                 "category": "Tempo de Refletir",
                 "date": date_text,
                 "thumbnail_url": thumbnail_url,
                 "source_url": str(href),
-                "is_new": True,
-                "is_starred": False,
-                "tags": ["Reflexão", "Devocional"],
                 "verse_content": verse_content,
                 "body_text": body_text,
                 "ai_summary": ai_summary,
-                "key_points": key_points,
                 "devotional_meditation": meditation,
                 "devotional_prayer": prayer or "Senhor, obrigado pela Tua palavra. Amém.",
                 "audio_url": detail.get("audio_url"),
                 "audio_duration": detail.get("audio_duration"),
-                "collected_at": _now_iso(),
-            })
+                "tags": ["Reflexão", "Devocional"],
+            }
 
-        existing = read_json("posts.json")
-        existing_list = existing if isinstance(existing, list) else []
-        existing_ids = {p["id"] for p in existing_list if isinstance(p, dict)}
-
-        new_posts = [p for p in posts if p["id"] not in existing_ids]
-        merged = posts + [p for p in existing_list if p["id"] not in {pp["id"] for pp in posts}]
-
-        if merged:
-            write_json("posts.json", merged)
+            _, criado = await repo.upsert(post_data)
+            posts_collected += 1
+            if criado:
+                new_posts += 1
 
     return {
-        "status": "success" if posts else "warning",
+        "status": "success" if posts_collected else "warning",
         "started_at": started_at,
         "finished_at": _now_iso(),
-        "posts_collected": len(posts),
-        "new_posts": len(new_posts),
+        "posts_collected": posts_collected,
+        "new_posts": new_posts,
         "message": (
-            f"{len(posts)} reflexões coletadas ({len(new_posts)} novas) de {SOURCE_URL}"
-            if posts
+            f"{posts_collected} reflexões coletadas ({new_posts} novas) de {SOURCE_URL}"
+            if posts_collected
             else "Nenhuma reflexão encontrada — verifique a estrutura da página."
         ),
     }

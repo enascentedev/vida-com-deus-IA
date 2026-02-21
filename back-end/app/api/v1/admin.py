@@ -2,9 +2,11 @@ import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.database import get_db
 from app.core.dependencies import get_current_user_id
-from app.core.scraper import scrape_reflexoes
+from app.core.scraper import run_etl
 from app.core.storage import append_etl_run, get_etl_runs
 from app.domain.admin.schemas import (
     AlertsResponse,
@@ -98,12 +100,15 @@ def list_etl_runs(user_id: str = Depends(get_current_user_id)) -> ETLRunsRespons
 
 
 @router.post("/etl/runs/execute", response_model=ETLExecuteResponse, status_code=202)
-def execute_etl(user_id: str = Depends(get_current_user_id)) -> ETLExecuteResponse:
-    """Dispara scraping manual de wgospel.com e salva posts em data/posts.json."""
+async def execute_etl_endpoint(
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> ETLExecuteResponse:
+    """Dispara scraping manual de wgospel.com e persiste posts no banco."""
     started_at = _now_iso()
     t0 = time.monotonic()
 
-    result = scrape_reflexoes()
+    result = await run_etl(db)
 
     elapsed = time.monotonic() - t0
     duration = f"{elapsed:.0f}s" if elapsed >= 1 else f"{elapsed * 1000:.0f}ms"

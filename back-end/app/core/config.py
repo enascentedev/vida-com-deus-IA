@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 15
     jwt_refresh_token_expire_days: int = 7
 
-    # Database (Fase 2)
-    database_url: str = "postgresql+psycopg://user:password@localhost:5432/vidacomdeus"
+    # Database
+    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/vida_com_deus"
 
     # Redis (Fase 2)
     redis_url: str = "redis://localhost:6379/0"

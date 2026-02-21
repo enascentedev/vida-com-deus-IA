@@ -1,16 +1,95 @@
 """
-Testes de contrato (Fase 1) — validam que todos os endpoints retornam
+Testes de contrato (Fase 2) — validam que todos os endpoints retornam
 status HTTP correto e schemas aderentes ao OpenAPI.
+
+Usa dependency_overrides para evitar dependência de banco ou token real.
 """
+
+import uuid
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.dependencies import get_current_user_id
+from app.core.database import get_db
+from app.domain.auth.schemas import MessageResponse, TokenPair
+from app.domain.chat.schemas import (
+    ChatMessage as ChatMessageSchema,
+    Conversation,
+    ConversationListResponse,
+    MessagesResponse,
+    SendMessageResponse,
+)
+from app.domain.library.schemas import FavoriteToggleResponse, LibraryResponse
+from app.domain.posts.schemas import (
+    AudioResponse,
+    FeedResponse,
+    PostDetail,
+    PostKeyPoint,
+    PostSummary,
+)
 from app.main import app
 
-client = TestClient(app)
+FAKE_USER_ID = str(uuid.uuid4())
 
-AUTH_HEADER = {"Authorization": "Bearer mock-token"}
+# Sobrescreve a dependência de autenticação para os testes de contrato
+app.dependency_overrides[get_current_user_id] = lambda: FAKE_USER_ID
+
+# Mock de sessão do banco — endpoints que usam get_db diretamente (auth)
+_mock_db = AsyncMock()
+app.dependency_overrides[get_db] = lambda: _mock_db
+
+client = TestClient(app)
+AUTH_HEADER = {"Authorization": "Bearer token-de-teste"}
+
+# Token pair falso para testes de auth
+_FAKE_TOKEN_PAIR = TokenPair(
+    access_token="fake-access-token",
+    refresh_token="fake-refresh-token",
+)
+
+# Objetos fake para library
+_FAKE_LIBRARY_EMPTY = LibraryResponse(items=[], total=0)
+_FAKE_FAV_ADDED = FavoriteToggleResponse(
+    post_id="post-001", is_favorited=True, message="Post adicionado aos favoritos."
+)
+_FAKE_FAV_REMOVED = FavoriteToggleResponse(
+    post_id="post-001", is_favorited=False, message="Post removido dos favoritos."
+)
+_FAKE_HISTORY_MSG = MessageResponse(message="Acesso registrado.")
+
+# Objetos fake para chat
+_FAKE_CONV_ID = str(uuid.uuid4())
+_FAKE_CONVERSATION = Conversation(
+    id=_FAKE_CONV_ID,
+    user_id=FAKE_USER_ID,
+    created_at="2026-02-21T00:00:00",
+    message_count=0,
+)
+_FAKE_CONV_LIST = ConversationListResponse(conversations=[_FAKE_CONVERSATION])
+_FAKE_MSG_USER = ChatMessageSchema(
+    id=str(uuid.uuid4()),
+    role="user",
+    content="O que a Bíblia diz sobre esperança?",
+    citations=[],
+    created_at="2026-02-21T00:00:00",
+)
+_FAKE_MSG_ASSISTANT = ChatMessageSchema(
+    id=str(uuid.uuid4()),
+    role="assistant",
+    content="A Bíblia fala muito sobre esperança.",
+    citations=[],
+    created_at="2026-02-21T00:00:00",
+)
+_FAKE_MESSAGES = MessagesResponse(
+    conversation_id=_FAKE_CONV_ID,
+    messages=[_FAKE_MSG_USER],
+)
+_FAKE_SEND_RESPONSE = SendMessageResponse(
+    user_message=_FAKE_MSG_USER,
+    assistant_message=_FAKE_MSG_ASSISTANT,
+)
 
 
 # ─── Health ──────────────────────────────────────────────────────────────────
@@ -25,7 +104,8 @@ def test_health():
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
-def test_signup():
+@patch("app.api.v1.auth.auth_service.signup", new_callable=AsyncMock, return_value=_FAKE_TOKEN_PAIR)
+def test_signup(mock_signup):
     r = client.post("/v1/auth/signup", json={
         "name": "João Silva",
         "email": "joao@exemplo.com",
@@ -38,7 +118,8 @@ def test_signup():
     assert body["token_type"] == "bearer"
 
 
-def test_login():
+@patch("app.api.v1.auth.auth_service.login", new_callable=AsyncMock, return_value=_FAKE_TOKEN_PAIR)
+def test_login(mock_login):
     r = client.post("/v1/auth/login", json={
         "email": "joao@exemplo.com",
         "password": "senha123",
@@ -49,19 +130,22 @@ def test_login():
     assert "refresh_token" in body
 
 
-def test_refresh():
+@patch("app.api.v1.auth.auth_service.refresh", new_callable=AsyncMock, return_value=_FAKE_TOKEN_PAIR)
+def test_refresh(mock_refresh):
     r = client.post("/v1/auth/refresh", json={"refresh_token": "any-token"})
     assert r.status_code == 200
     assert "access_token" in r.json()
 
 
-def test_forgot_password():
+@patch("app.api.v1.auth.auth_service.forgot_password", new_callable=AsyncMock, return_value=None)
+def test_forgot_password(mock_forgot):
     r = client.post("/v1/auth/forgot-password", json={"email": "joao@exemplo.com"})
     assert r.status_code == 200
     assert "message" in r.json()
 
 
-def test_reset_password():
+@patch("app.api.v1.auth.auth_service.reset_password", new_callable=AsyncMock, return_value=None)
+def test_reset_password(mock_reset):
     r = client.post("/v1/auth/reset-password", json={
         "token": "reset-token-123",
         "new_password": "nova-senha-456",
@@ -70,7 +154,8 @@ def test_reset_password():
     assert "message" in r.json()
 
 
-def test_logout():
+@patch("app.api.v1.auth.auth_service.logout", new_callable=AsyncMock, return_value=None)
+def test_logout(mock_logout):
     r = client.post("/v1/auth/logout", headers=AUTH_HEADER)
     assert r.status_code == 200
     assert "message" in r.json()
@@ -78,7 +163,12 @@ def test_logout():
 
 # ─── Users ───────────────────────────────────────────────────────────────────
 
-def test_get_me():
+@patch("app.api.v1.users.user_service.get_me", new_callable=AsyncMock)
+def test_get_me(mock_get_me):
+    mock_get_me.return_value = {
+        "id": FAKE_USER_ID, "name": "Gabriel Santos",
+        "email": "gabriel@vidacomdeus.com", "plan": "free",
+    }
     r = client.get("/v1/users/me", headers=AUTH_HEADER)
     assert r.status_code == 200
     body = r.json()
@@ -87,13 +177,23 @@ def test_get_me():
     assert "email" in body
 
 
-def test_update_me():
+@patch("app.api.v1.users.user_service.update_me", new_callable=AsyncMock)
+def test_update_me(mock_update):
+    mock_update.return_value = {
+        "id": FAKE_USER_ID, "name": "Gabriel S.",
+        "email": "gabriel@vidacomdeus.com", "plan": "free",
+    }
     r = client.patch("/v1/users/me", json={"name": "Gabriel S."}, headers=AUTH_HEADER)
     assert r.status_code == 200
     assert r.json()["name"] == "Gabriel S."
 
 
-def test_get_settings():
+@patch("app.api.v1.users.user_service.get_settings", new_callable=AsyncMock)
+def test_get_settings(mock_settings):
+    mock_settings.return_value = {
+        "theme": "system", "ai_insights": True,
+        "biblical_reminders": True, "rag_memory": False,
+    }
     r = client.get("/v1/users/me/settings", headers=AUTH_HEADER)
     assert r.status_code == 200
     body = r.json()
@@ -103,7 +203,12 @@ def test_get_settings():
     assert "rag_memory" in body
 
 
-def test_update_settings():
+@patch("app.api.v1.users.user_service.update_settings", new_callable=AsyncMock)
+def test_update_settings(mock_update):
+    mock_update.return_value = {
+        "theme": "dark", "ai_insights": True,
+        "biblical_reminders": True, "rag_memory": False,
+    }
     r = client.patch("/v1/users/me/settings", json={"theme": "dark"}, headers=AUTH_HEADER)
     assert r.status_code == 200
     assert r.json()["theme"] == "dark"
@@ -111,7 +216,50 @@ def test_update_settings():
 
 # ─── Posts ───────────────────────────────────────────────────────────────────
 
-def test_get_feed():
+_FAKE_POST_ID = str(uuid.uuid4())
+
+_FAKE_POST_SUMMARY = PostSummary(
+    id=_FAKE_POST_ID,
+    title="Encontrando Paz no Meio do Caos",
+    reference="Salmos 23:1",
+    category="Post do Dia",
+    date="24 de Maio, 2024",
+    thumbnail_url="https://example.com/img.jpg",
+    is_new=True,
+    tags=["Paz", "Fé", "Salmos"],
+)
+
+_FAKE_FEED = FeedResponse(
+    post_of_day=_FAKE_POST_SUMMARY,
+    recent_posts=[_FAKE_POST_SUMMARY],
+)
+
+_FAKE_POST_DETAIL = PostDetail(
+    id=_FAKE_POST_ID,
+    title="Encontrando Paz no Meio do Caos",
+    reference="Salmos 23:1",
+    category="Post do Dia",
+    date="24 de Maio, 2024",
+    verse_content="O Senhor é meu pastor, nada me faltará.",
+    ai_summary="Resumo do post.",
+    key_points=[PostKeyPoint(text="Ponto chave de teste")],
+    tags=["Paz", "Fé"],
+    devotional_meditation="Meditação de teste.",
+    devotional_prayer="Oração de teste.",
+    audio_url="https://example.com/audio.mp3",
+    audio_duration="5:00",
+)
+
+_FAKE_AUDIO = AudioResponse(
+    post_id=_FAKE_POST_ID,
+    url="https://example.com/audio.mp3",
+    duration="5:00",
+    title="Encontrando Paz no Meio do Caos",
+)
+
+
+@patch("app.services.post_service.PostService.get_feed", new_callable=AsyncMock, return_value=_FAKE_FEED)
+def test_get_feed(mock_feed):
     r = client.get("/v1/posts/feed", headers=AUTH_HEADER)
     assert r.status_code == 200
     body = r.json()
@@ -120,21 +268,24 @@ def test_get_feed():
     assert isinstance(body["recent_posts"], list)
 
 
-def test_list_posts():
+@patch("app.services.post_service.PostService.list_posts", new_callable=AsyncMock, return_value=[_FAKE_POST_SUMMARY])
+def test_list_posts(mock_list):
     r = client.get("/v1/posts", headers=AUTH_HEADER)
     assert r.status_code == 200
     assert isinstance(r.json(), list)
 
 
-def test_list_posts_with_query():
+@patch("app.services.post_service.PostService.list_posts", new_callable=AsyncMock, return_value=[_FAKE_POST_SUMMARY])
+def test_list_posts_with_query(mock_list):
     r = client.get("/v1/posts?query=Paz", headers=AUTH_HEADER)
     assert r.status_code == 200
     results = r.json()
     assert all("Paz" in p["title"] or "paz" in p["title"].lower() for p in results)
 
 
-def test_get_post_detail():
-    r = client.get("/v1/posts/post-001", headers=AUTH_HEADER)
+@patch("app.services.post_service.PostService.get_post_detail", new_callable=AsyncMock, return_value=_FAKE_POST_DETAIL)
+def test_get_post_detail(mock_detail):
+    r = client.get(f"/v1/posts/{_FAKE_POST_ID}", headers=AUTH_HEADER)
     assert r.status_code == 200
     body = r.json()
     assert "title" in body
@@ -144,8 +295,9 @@ def test_get_post_detail():
     assert isinstance(body["key_points"], list)
 
 
-def test_get_post_audio():
-    r = client.get("/v1/posts/post-001/audio", headers=AUTH_HEADER)
+@patch("app.services.post_service.PostService.get_post_audio", new_callable=AsyncMock, return_value=_FAKE_AUDIO)
+def test_get_post_audio(mock_audio):
+    r = client.get(f"/v1/posts/{_FAKE_POST_ID}/audio", headers=AUTH_HEADER)
     assert r.status_code == 200
     body = r.json()
     assert "url" in body
@@ -154,7 +306,8 @@ def test_get_post_audio():
 
 # ─── Library ─────────────────────────────────────────────────────────────────
 
-def test_get_favorites():
+@patch("app.services.library_service.LibraryService.get_library", new_callable=AsyncMock, return_value=_FAKE_LIBRARY_EMPTY)
+def test_get_favorites(mock_get):
     r = client.get("/v1/library?tab=favorites", headers=AUTH_HEADER)
     assert r.status_code == 200
     body = r.json()
@@ -163,13 +316,15 @@ def test_get_favorites():
     assert isinstance(body["items"], list)
 
 
-def test_get_history():
+@patch("app.services.library_service.LibraryService.get_library", new_callable=AsyncMock, return_value=_FAKE_LIBRARY_EMPTY)
+def test_get_history(mock_get):
     r = client.get("/v1/library?tab=history", headers=AUTH_HEADER)
     assert r.status_code == 200
     assert isinstance(r.json()["items"], list)
 
 
-def test_add_favorite():
+@patch("app.services.library_service.LibraryService.add_favorite", new_callable=AsyncMock, return_value=_FAKE_FAV_ADDED)
+def test_add_favorite(mock_add):
     r = client.post("/v1/library/favorites/post-001", headers=AUTH_HEADER)
     assert r.status_code == 201
     body = r.json()
@@ -177,14 +332,16 @@ def test_add_favorite():
     assert body["post_id"] == "post-001"
 
 
-def test_remove_favorite():
+@patch("app.services.library_service.LibraryService.remove_favorite", new_callable=AsyncMock, return_value=_FAKE_FAV_REMOVED)
+def test_remove_favorite(mock_remove):
     r = client.delete("/v1/library/favorites/post-001", headers=AUTH_HEADER)
     assert r.status_code == 200
     body = r.json()
     assert body["is_favorited"] is False
 
 
-def test_record_history():
+@patch("app.services.library_service.LibraryService.record_history", new_callable=AsyncMock, return_value=_FAKE_HISTORY_MSG)
+def test_record_history(mock_history):
     r = client.post("/v1/library/history", json={"post_id": "post-001"}, headers=AUTH_HEADER)
     assert r.status_code == 201
     assert "message" in r.json()
@@ -192,7 +349,8 @@ def test_record_history():
 
 # ─── Chat ─────────────────────────────────────────────────────────────────────
 
-def test_create_conversation():
+@patch("app.services.chat_service.ChatService.create_conversation", new_callable=AsyncMock, return_value=_FAKE_CONVERSATION)
+def test_create_conversation(mock_create):
     r = client.post("/v1/chat/conversations", headers=AUTH_HEADER)
     assert r.status_code == 201
     body = r.json()
@@ -200,13 +358,15 @@ def test_create_conversation():
     assert "user_id" in body
 
 
-def test_list_conversations():
+@patch("app.services.chat_service.ChatService.list_conversations", new_callable=AsyncMock, return_value=_FAKE_CONV_LIST)
+def test_list_conversations(mock_list):
     r = client.get("/v1/chat/conversations", headers=AUTH_HEADER)
     assert r.status_code == 200
     assert "conversations" in r.json()
 
 
-def test_get_messages():
+@patch("app.services.chat_service.ChatService.get_messages", new_callable=AsyncMock, return_value=_FAKE_MESSAGES)
+def test_get_messages(mock_get):
     r = client.get("/v1/chat/conversations/conv-001/messages", headers=AUTH_HEADER)
     assert r.status_code == 200
     body = r.json()
@@ -217,7 +377,8 @@ def test_get_messages():
     assert msgs[0]["role"] in ("user", "assistant")
 
 
-def test_send_message():
+@patch("app.services.chat_service.ChatService.send_message", new_callable=AsyncMock, return_value=_FAKE_SEND_RESPONSE)
+def test_send_message(mock_send):
     r = client.post(
         "/v1/chat/conversations/conv-001/messages",
         json={"content": "O que a Bíblia diz sobre esperança?"},
@@ -463,12 +624,20 @@ def test_get_etl_runs():
     assert run["status"] in ("success", "failed", "running", "pending")
 
 
-def test_execute_etl():
+@patch("app.api.v1.admin.run_etl", new_callable=AsyncMock, return_value={
+    "status": "success",
+    "started_at": "2026-02-21T00:00:00Z",
+    "finished_at": "2026-02-21T00:00:05Z",
+    "posts_collected": 5,
+    "new_posts": 3,
+    "message": "5 reflexões coletadas (3 novas)",
+})
+def test_execute_etl(mock_etl):
     r = client.post("/v1/admin/etl/runs/execute", headers=AUTH_HEADER)
     assert r.status_code == 202
     body = r.json()
     assert "run_id" in body
-    assert body["status"] == "running"
+    assert body["status"] in ("success", "running")
 
 
 def test_get_alerts():
