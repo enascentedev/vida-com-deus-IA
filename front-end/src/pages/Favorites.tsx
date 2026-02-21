@@ -1,5 +1,8 @@
-import { useState } from "react"
-import { Search, MoreHorizontal, BookOpen, Bot, Heart, ChevronRight, Trash2, Plus, ChevronDown } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Search, MoreHorizontal, BookOpen, Bot, ChevronRight, Trash2, Plus, ChevronDown } from "lucide-react"
+import { libraryApi } from "@/lib/api"
+import type { LibraryItem } from "@/lib/api"
+import { Skeleton } from "vida-com-deus-ui"
 import { BottomNavigation } from "@/components/layout/BottomNavigation"
 
 /* -------------------------------------------------------------------------- */
@@ -7,46 +10,18 @@ import { BottomNavigation } from "@/components/layout/BottomNavigation"
 /* -------------------------------------------------------------------------- */
 type TabView = "favoritos" | "historico"
 
-interface LibraryItem {
-  id: number
-  icon: React.ReactNode
-  title: string
-  subtitle: string
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Dados mock                                                                 */
-/* -------------------------------------------------------------------------- */
-const ITEMS: LibraryItem[] = [
-  {
-    id: 1,
-    icon: <BookOpen size={22} className="text-blue-600" />,
-    title: "Encontrando Paz na Oração",
-    subtitle: "Salvo em 24 de Out • #Esperança",
-  },
-  {
-    id: 2,
-    icon: <Bot size={22} className="text-blue-600" />,
-    title: "Significado de Salmos 23",
-    subtitle: "Salvo em 22 de Out • #EstudoBíblico",
-  },
-  {
-    id: 3,
-    icon: <Heart size={22} className="text-blue-600" />,
-    title: "Força em Tempos de Incerteza",
-    subtitle: "Salvo em 20 de Out • #Fé",
-  },
-]
-
 /* -------------------------------------------------------------------------- */
 /*  Item de Lista                                                              */
 /* -------------------------------------------------------------------------- */
-function LibraryListItem({ item, onDelete }: { item: LibraryItem; onDelete: (id: number) => void }) {
+function LibraryListItem({ item, onDelete }: { item: LibraryItem; onDelete: (item: LibraryItem) => void }) {
+  // Ícone baseado no tipo do item
+  const Icon = item.type === "chat" ? Bot : BookOpen
+
   return (
     <div className="flex items-center gap-4 bg-white px-4 min-h-[88px] py-3 justify-between cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_4px_16px_-4px_rgb(37_99_235/0.10)] transition-all duration-200 border-b border-slate-100 last:border-0">
       <div className="flex items-center gap-4 flex-1">
-        <div className="flex items-center justify-center rounded-xl bg-blue-600/10 shrink-0 size-12 transition-colors duration-200 group-hover:bg-blue-600/20">
-          {item.icon}
+        <div className="flex items-center justify-center rounded-xl bg-blue-600/10 shrink-0 size-12 transition-colors duration-200">
+          <Icon size={22} className="text-blue-600" />
         </div>
         <div className="flex flex-col justify-center min-w-0">
           <p className="text-slate-900 text-base font-semibold leading-tight truncate">
@@ -59,13 +34,28 @@ function LibraryListItem({ item, onDelete }: { item: LibraryItem; onDelete: (id:
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <button
-          onClick={() => onDelete(item.id)}
+          onClick={() => onDelete(item)}
           className="p-2 text-slate-300 hover:text-red-500 active:scale-95 transition-all duration-200"
           aria-label="Excluir item"
         >
           <Trash2 size={18} />
         </button>
         <ChevronRight size={20} className="text-slate-300" />
+      </div>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Skeleton de item                                                           */
+/* -------------------------------------------------------------------------- */
+function ItemSkeleton() {
+  return (
+    <div className="flex items-center gap-4 bg-white px-4 min-h-[88px] py-3 border-b border-slate-100 last:border-0">
+      <Skeleton className="size-12 rounded-xl shrink-0" />
+      <div className="flex-1 space-y-2">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-3 w-1/2" />
       </div>
     </div>
   )
@@ -81,16 +71,35 @@ const FILTER_CHIPS = ["Últimos 7 dias", "Chat Bíblico", "Devocionais"]
 /* -------------------------------------------------------------------------- */
 export function Favorites() {
   const [activeTab, setActiveTab] = useState<TabView>("favoritos")
-  const [items, setItems] = useState<LibraryItem[]>(ITEMS)
+  const [items, setItems] = useState<LibraryItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [activeFilter, setActiveFilter] = useState<string | null>(null)
+
+  // Carrega itens da biblioteca ao montar e ao trocar de aba
+  useEffect(() => {
+    let cancelled = false
+    setIsLoading(true)
+    const tab = activeTab === "favoritos" ? "favorites" : "history"
+    libraryApi.getLibrary(tab)
+      .then((data) => { if (!cancelled) setItems(data.items) })
+      .catch(() => { if (!cancelled) setItems([]) })
+      .finally(() => { if (!cancelled) setIsLoading(false) })
+    return () => { cancelled = true }
+  }, [activeTab])
 
   const filtered = items.filter((item) =>
     item.title.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  function handleDelete(id: number) {
-    setItems((prev) => prev.filter((i) => i.id !== id))
+  // Delete otimista: remove imediatamente e reverte se a API falhar
+  async function handleDelete(item: LibraryItem) {
+    setItems((prev) => prev.filter((i) => i.id !== item.id))
+    try {
+      await libraryApi.removeFavorite(item.post_id)
+    } catch {
+      setItems((prev) => [...prev, item]) // reverte
+    }
   }
 
   return (
@@ -173,7 +182,13 @@ export function Favorites() {
         </div>
 
         {/* Lista */}
-        {filtered.length > 0 ? (
+        {isLoading ? (
+          <div className="flex flex-col mx-4 rounded-2xl overflow-hidden border border-slate-100 shadow-sm">
+            <ItemSkeleton />
+            <ItemSkeleton />
+            <ItemSkeleton />
+          </div>
+        ) : filtered.length > 0 ? (
           <div className="flex flex-col mx-4 rounded-2xl overflow-hidden border border-slate-100 shadow-sm animate-slide-up">
             {filtered.map((item) => (
               <LibraryListItem key={item.id} item={item} onDelete={handleDelete} />

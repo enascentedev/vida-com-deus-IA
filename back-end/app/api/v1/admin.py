@@ -1,8 +1,11 @@
+import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 
 from app.core.dependencies import get_current_user_id
+from app.core.scraper import scrape_reflexoes
+from app.core.storage import append_etl_run, get_etl_runs
 from app.domain.admin.schemas import (
     AlertsResponse,
     ETLExecuteResponse,
@@ -44,31 +47,6 @@ MOCK_GROWTH = GrowthMetric(
     ],
 )
 
-MOCK_ETL_RUNS = [
-    ETLRun(
-        id="etl-001",
-        name="Bible RAG Update",
-        status="success",
-        started_at="2024-10-25T09:42:00Z",
-        duration="12s",
-    ),
-    ETLRun(
-        id="etl-002",
-        name="Devotional Sync",
-        status="success",
-        started_at="2024-10-24T23:15:00Z",
-        duration="45s",
-    ),
-    ETLRun(
-        id="etl-003",
-        name="User Insights Batch",
-        status="failed",
-        started_at="2024-10-24T14:00:00Z",
-        duration="—",
-        error="API Timeout",
-    ),
-]
-
 MOCK_ALERTS = [
     SystemAlert(
         id="alert-001",
@@ -107,18 +85,44 @@ def get_growth_metrics(user_id: str = Depends(get_current_user_id)) -> GrowthMet
 
 
 @router.get("/etl/runs", response_model=ETLRunsResponse)
-def get_etl_runs(user_id: str = Depends(get_current_user_id)) -> ETLRunsResponse:
-    """Lista as últimas execuções de ETL."""
-    return ETLRunsResponse(runs=MOCK_ETL_RUNS)
+def list_etl_runs(user_id: str = Depends(get_current_user_id)) -> ETLRunsResponse:
+    """Lista as últimas execuções reais de ETL (persistidas em etl_runs.json)."""
+    raw = get_etl_runs()
+    runs = []
+    for item in raw:
+        try:
+            runs.append(ETLRun(**item))
+        except Exception:
+            continue
+    return ETLRunsResponse(runs=runs)
 
 
 @router.post("/etl/runs/execute", response_model=ETLExecuteResponse, status_code=202)
 def execute_etl(user_id: str = Depends(get_current_user_id)) -> ETLExecuteResponse:
-    """Dispara uma execução manual de ETL."""
+    """Dispara scraping manual de wgospel.com e salva posts em data/posts.json."""
+    started_at = _now_iso()
+    t0 = time.monotonic()
+
+    result = scrape_reflexoes()
+
+    elapsed = time.monotonic() - t0
+    duration = f"{elapsed:.0f}s" if elapsed >= 1 else f"{elapsed * 1000:.0f}ms"
+    status = result.get("status", "success")
+    run_id = f"etl-manual-{started_at}"
+
+    append_etl_run({
+        "id": run_id,
+        "name": "Scraping wgospel.com",
+        "status": "success" if status == "success" else "failed",
+        "started_at": started_at,
+        "duration": duration,
+        "error": result.get("error"),
+    })
+
     return ETLExecuteResponse(
-        run_id=f"etl-manual-{_now_iso()}",
-        message="ETL iniciado com sucesso.",
-        status="running",
+        run_id=run_id,
+        message=result.get("message", "ETL concluído."),
+        status=status,
     )
 
 

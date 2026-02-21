@@ -1,6 +1,8 @@
 """
-Captura screenshots de todas as rotas da aplicação em tamanho desktop e mobile (iPhone 11).
-As imagens são salvas em screenshots/{data-hora}/desktop/ e screenshots/{data-hora}/mobile-iphone11/
+Captura screenshots de todas as rotas da aplicação em tamanho desktop e mobile
+(iPhone 11). As imagens são salvas em
+`screenshots/screenshot-routes/{data-hora}/desktop/` e
+`screenshots/screenshot-routes/{data-hora}/mobile-iphone11/` na raiz do repo.
 """
 
 import os
@@ -10,6 +12,8 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 BASE_URL = "http://localhost:5173"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BASE_SCREENSHOTS_DIR = REPO_ROOT / "screenshots" / "screenshot-routes"
 
 ROTAS = [
     ("/landing",         "landing"),
@@ -40,7 +44,13 @@ IPHONE_11 = {
 
 
 def capture(timestamp: str) -> None:
-    base_dir = Path("screenshots") / timestamp
+    """Percorre rotas e salva screenshots desktop e iPhone 11.
+
+    Args:
+        timestamp: sufixo de pasta (ex.: `YYYY-MM-DD_HH-MM-SS`) usado para
+            agrupar as imagens em `screenshots/screenshot-routes/<timestamp>/`.
+    """
+    base_dir = BASE_SCREENSHOTS_DIR / timestamp
     desktop_dir = base_dir / "desktop"
     mobile_dir  = base_dir / "mobile-iphone11"
 

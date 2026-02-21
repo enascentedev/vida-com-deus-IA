@@ -1,0 +1,18 @@
+[
+  {
+    "id": "etl-manual-2026-02-21T05:25:53.953539Z",
+    "name": "Scraping wgospel.com",
+    "status": "success",
+    "started_at": "2026-02-21T05:25:53.953539Z",
+    "duration": "16s",
+    "error": null
+  },
+  {
+    "id": "etl-manual-2026-02-21T05:05:16.928558Z",
+    "name": "Scraping wgospel.com",
+    "status": "success",
+    "started_at": "2026-02-21T05:05:16.928558Z",
+    "duration": "12s",
+    "error": null
+  }
+]

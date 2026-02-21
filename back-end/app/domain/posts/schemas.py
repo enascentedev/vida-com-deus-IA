@@ -24,7 +24,9 @@ class PostDetail(BaseModel):
     category: str
     date: str
     thumbnail_url: str | None = None
+    source_url: str | None = None
     verse_content: str
+    body_text: str | None = None
     ai_summary: str
     key_points: list[PostKeyPoint] = []
     tags: list[str] = []

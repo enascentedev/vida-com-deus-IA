@@ -1,5 +1,17 @@
+"""Executa varredura de rotas do front-end e coleta erros.
+
+O script usa Playwright em modo headless para navegar nas principais rotas do
+app Vite/React, captura erros de página, mensagens de console (erros/avisos) e
+uma screenshot por rota, registrando tudo em um dicionário e imprimindo um
+resumo no stdout. As capturas ficam em `screenshots/check-errors/<timestamp>/`.
+"""
+
+from datetime import datetime
+from pathlib import Path
 from playwright.sync_api import sync_playwright
-import json
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+BASE_SCREENSHOTS_DIR = REPO_ROOT / "screenshots" / "check-errors"
 
 ROUTES = [
     "/",
@@ -14,7 +26,13 @@ ROUTES = [
     "/post/1",
 ]
 
+
 def run():
+    """Percorre as rotas, captura erros e gera resumo no console."""
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    output_dir = BASE_SCREENSHOTS_DIR / timestamp
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         all_errors = {}
@@ -34,16 +52,16 @@ def run():
             except Exception as e:
                 errors.append(f"NAVIGATION ERROR: {e}")
 
-            screenshot_path = f"/tmp/screen_{route.replace('/', '_') or 'home'}.png"
+            screenshot_path = output_dir / f"screen_{route.replace('/', '_') or 'home'}.png"
             try:
-                page.screenshot(path=screenshot_path, full_page=True)
+                page.screenshot(path=str(screenshot_path), full_page=True)
             except Exception:
                 pass
 
             all_errors[route] = {
                 "page_errors": errors,
                 "console_errors": console_errors,
-                "screenshot": screenshot_path,
+                "screenshot": str(screenshot_path.resolve()),
             }
             page.close()
 
@@ -63,6 +81,8 @@ def run():
 
         if not has_errors:
             print("\nNenhum erro encontrado em nenhuma rota!")
+
+        print(f"\nScreenshots salvas em: {output_dir.resolve()}")
 
 if __name__ == "__main__":
     run()

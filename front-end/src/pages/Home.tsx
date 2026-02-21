@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react"
 import {
   Bell,
   BookOpen,
@@ -10,21 +11,24 @@ import {
   Sparkles,
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { postsApi } from "@/lib/api"
+import type { FeedResponse, PostSummary } from "@/lib/api"
+import { useAuthStore } from "@/store/useAuthStore"
 import { Button, Badge, Skeleton } from "vida-com-deus-ui"
 import { BottomNavigation } from "@/components/layout/BottomNavigation"
 
 /* -------------------------------------------------------------------------- */
-/*  Imagens placeholder (substituir por imagens reais depois)                  */
+/*  Imagens placeholder (usadas como fallback)                                 */
 /* -------------------------------------------------------------------------- */
 const HERO_IMAGE = "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80"
-const THUMB_BIBLE = "https://images.unsplash.com/photo-1504052434569-70ad5836ab65?w=200&q=80"
-const THUMB_PRAY = "https://images.unsplash.com/photo-1545232979-8bf68ee9b1af?w=200&q=80"
 const AVATAR_URL = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80"
 
 /* -------------------------------------------------------------------------- */
 /*  Topbar                                                                     */
 /* -------------------------------------------------------------------------- */
 function Topbar() {
+  const avatarUrl = useAuthStore((s) => s.user?.avatar_url) ?? AVATAR_URL
+  const navigate = useNavigate()
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
       <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
@@ -41,13 +45,17 @@ function Topbar() {
           >
             <Bell size={22} className="text-slate-600" />
           </button>
-          <div className="h-10 w-10 overflow-hidden rounded-full border-2 border-blue-100">
+          <button
+            onClick={() => navigate("/configuracoes")}
+            className="h-10 w-10 overflow-hidden rounded-full border-2 border-blue-100 transition-opacity hover:opacity-80 active:scale-95"
+            aria-label="Ir para configurações"
+          >
             <img
-              src={AVATAR_URL}
+              src={avatarUrl}
               alt="Avatar do usuário"
               className="h-full w-full object-cover"
             />
-          </div>
+          </button>
         </div>
       </div>
       {/* Barra de busca */}
@@ -71,7 +79,7 @@ function Topbar() {
 /* -------------------------------------------------------------------------- */
 /*  Hero Card (Post do Dia)                                                    */
 /* -------------------------------------------------------------------------- */
-function HeroCard() {
+function HeroCard({ post }: { post: PostSummary | null }) {
   const navigate = useNavigate()
   return (
     <div className="px-4 py-4 animate-slide-up">
@@ -84,31 +92,45 @@ function HeroCard() {
         </div>
         {/* Imagem */}
         <div className="w-full aspect-[16/9] relative overflow-hidden">
-          <img
-            src={HERO_IMAGE}
-            alt="Pôr do sol sobre lago, representando paz"
-            className="w-full h-full object-cover transition-transform duration-500 hover:scale-[1.03]"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+          {post === null ? (
+            <Skeleton className="w-full h-full" />
+          ) : (
+            <>
+              <img
+                src={post.thumbnail_url ?? HERO_IMAGE}
+                alt={post.title}
+                className="w-full h-full object-cover transition-transform duration-500 hover:scale-[1.03]"
+              />
+              <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/20 to-transparent" />
+            </>
+          )}
         </div>
         {/* Conteúdo */}
         <div className="absolute bottom-0 w-full p-5">
-          <p className="text-xs opacity-80 mb-1 uppercase font-medium">24 de Maio, 2024</p>
-          <h2 className="text-2xl font-bold leading-tight mb-3">
-            Encontrando Paz no Meio do Caos
-          </h2>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm">
-              <BookOpen size={16} className="text-blue-400" />
-              <span>Salmos 23:1</span>
+          {post === null ? (
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-28 bg-white/20" />
+              <Skeleton className="h-7 w-3/4 bg-white/20" />
+              <Skeleton className="h-4 w-1/3 bg-white/20" />
             </div>
-            <Button
-              onClick={() => navigate("/post/1")}
-              className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all duration-200"
-            >
-              Ler Reflexão
-            </Button>
-          </div>
+          ) : (
+            <>
+              <p className="text-xs opacity-80 mb-1 uppercase font-medium">{post.date}</p>
+              <h2 className="text-2xl font-bold leading-tight mb-3">{post.title}</h2>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm">
+                  <BookOpen size={16} className="text-blue-400" />
+                  <span>{post.reference}</span>
+                </div>
+                <Button
+                  onClick={() => navigate(`/post/${post.id}`)}
+                  className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold hover:bg-blue-700 active:scale-[0.98] transition-all duration-200"
+                >
+                  Ler Reflexão
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -134,34 +156,20 @@ function HeroCard() {
 /* -------------------------------------------------------------------------- */
 /*  Post Recente                                                               */
 /* -------------------------------------------------------------------------- */
-interface RecentPostProps {
-  title: string
-  reference: string
-  category: string
-  date: string
-  thumbnail: string
-  isNew?: boolean
-  isStarred?: boolean
-}
-
-function RecentPost({
-  title,
-  reference,
-  category,
-  date,
-  thumbnail,
-  isNew,
-  isStarred,
-}: RecentPostProps) {
+function RecentPost({ post }: { post: PostSummary }) {
   const navigate = useNavigate()
   return (
     <button
-      onClick={() => navigate("/post/1")}
+      onClick={() => navigate(`/post/${post.id}`)}
       className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm w-full text-left transition-all duration-200 hover:shadow-[0_4px_20px_-4px_rgb(37_99_235/0.12)] hover:-translate-y-0.5 active:scale-[0.99]"
     >
       <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl">
-        <img src={thumbnail} alt={title} className="h-full w-full object-cover" />
-        {isNew && (
+        <img
+          src={post.thumbnail_url ?? HERO_IMAGE}
+          alt={post.title}
+          className="h-full w-full object-cover"
+        />
+        {post.is_new && (
           <span className="absolute -top-1 -right-1 flex h-3 w-3">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-600 opacity-75" />
             <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-600" />
@@ -170,7 +178,7 @@ function RecentPost({
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-0.5">
-          {isNew && (
+          {post.is_new && (
             <Badge
               variant="secondary"
               className="h-4 border-none bg-blue-50 px-1.5 text-[10px] text-blue-600 font-bold uppercase"
@@ -178,12 +186,12 @@ function RecentPost({
               Novo
             </Badge>
           )}
-          {isStarred && <Star size={12} className="fill-amber-400 text-amber-400" />}
-          <span className="text-xs text-slate-400">{date}</span>
+          {post.is_starred && <Star size={12} className="fill-amber-400 text-amber-400" />}
+          <span className="text-xs text-slate-400">{post.date}</span>
         </div>
-        <h3 className="truncate font-bold text-slate-800">{title}</h3>
+        <h3 className="truncate font-bold text-slate-800">{post.title}</h3>
         <p className="text-xs text-slate-500">
-          {reference} • {category}
+          {post.reference} • {post.category}
         </p>
       </div>
       <ChevronRight size={20} className="flex-shrink-0 text-slate-300" />
@@ -210,7 +218,7 @@ function PostSkeleton() {
 /* -------------------------------------------------------------------------- */
 /*  Seção de Posts Recentes                                                    */
 /* -------------------------------------------------------------------------- */
-function RecentPostsSection() {
+function RecentPostsSection({ posts, isLoading }: { posts: PostSummary[]; isLoading: boolean }) {
   return (
     <div className="space-y-3 px-4 pb-4 animate-slide-up">
       <div className="flex items-center justify-between pt-1">
@@ -218,23 +226,14 @@ function RecentPostsSection() {
         <button className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors duration-200">Ver tudo</button>
       </div>
       <div className="space-y-3">
-        <RecentPost
-          title="A Força na Fraqueza"
-          reference="2 Coríntios 12:9"
-          category="Reflexão Diária"
-          date="Há 2 horas"
-          thumbnail={THUMB_BIBLE}
-          isNew
-        />
-        <RecentPost
-          title="O Propósito no Deserto"
-          reference="Êxodo 3:1-10"
-          category="Série Moisés"
-          date="Ontem"
-          thumbnail={THUMB_PRAY}
-          isStarred
-        />
-        <PostSkeleton />
+        {isLoading ? (
+          <>
+            <PostSkeleton />
+            <PostSkeleton />
+          </>
+        ) : (
+          posts.map((post) => <RecentPost key={post.id} post={post} />)
+        )}
       </div>
     </div>
   )
@@ -270,13 +269,33 @@ function ChatCTA() {
 /*  Página Home                                                                */
 /* -------------------------------------------------------------------------- */
 export function Home() {
+  const [feed, setFeed] = useState<FeedResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Carrega o feed ao montar o componente
+  useEffect(() => {
+    let cancelled = false
+    postsApi.getFeed()
+      .then((data) => { if (!cancelled) setFeed(data) })
+      .catch(() => { if (!cancelled) setError("Não foi possível carregar o feed.") })
+      .finally(() => { if (!cancelled) setIsLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
       <Topbar />
 
       <main className="flex-1 pb-4 max-w-2xl mx-auto w-full">
-        <HeroCard />
-        <RecentPostsSection />
+        <HeroCard post={feed?.post_of_day ?? null} />
+        {error && (
+          <p className="text-sm text-red-500 text-center px-4 py-2">{error}</p>
+        )}
+        <RecentPostsSection
+          posts={feed?.recent_posts ?? []}
+          isLoading={isLoading}
+        />
         <ChatCTA />
       </main>
 

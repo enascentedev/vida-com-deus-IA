@@ -232,6 +232,207 @@ def test_send_message():
     assert isinstance(ai["citations"], list)
 
 
+# ─── Therapist ────────────────────────────────────────────────────────────────
+
+def test_therapist_overview():
+    r = client.get("/v1/therapist/overview", headers=AUTH_HEADER)
+    assert r.status_code == 200
+    body = r.json()
+    assert "total_patients" in body
+    assert "active_patients" in body
+    assert "paused_patients" in body
+    assert "discharged_patients" in body
+    assert isinstance(body["near_limit_patients"], list)
+    assert isinstance(body["recent_activity"], list)
+
+
+def test_therapist_list_patients():
+    r = client.get("/v1/therapist/patients", headers=AUTH_HEADER)
+    assert r.status_code == 200
+    body = r.json()
+    assert "patients" in body
+    assert "total" in body
+    assert isinstance(body["patients"], list)
+    assert body["total"] >= 1
+    p = body["patients"][0]
+    assert "id" in p
+    assert "name" in p
+    assert "email" in p
+    assert "status" in p
+    assert "sessions" not in p  # PatientSummary nao inclui sessions
+
+
+def test_therapist_create_patient():
+    r = client.post("/v1/therapist/patients", json={
+        "name": "Teste Criação",
+        "email": "teste@email.com",
+        "chief_complaint": "Queixa de teste",
+        "anxiety_level": "mild",
+        "messages_limit": 50,
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 201
+    body = r.json()
+    assert body["name"] == "Teste Criação"
+    assert body["email"] == "teste@email.com"
+    assert body["status"] == "active"
+    assert body["messages_limit"] == 50
+    assert "id" in body
+    assert "sessions" in body
+
+
+def test_therapist_create_patient_with_first_session():
+    r = client.post("/v1/therapist/patients", json={
+        "name": "Com Sessão",
+        "email": "sessao@email.com",
+        "first_session_date": "2025-12-01",
+        "first_session_summary": "Sessão inicial",
+        "first_session_mood": "good",
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 201
+    body = r.json()
+    assert len(body["sessions"]) == 1
+    assert body["sessions"][0]["mood"] == "good"
+
+
+def test_therapist_create_patient_invalid_email():
+    r = client.post("/v1/therapist/patients", json={
+        "name": "Email Inválido",
+        "email": "nao-e-email",
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 422
+
+
+def test_therapist_create_patient_missing_name():
+    r = client.post("/v1/therapist/patients", json={
+        "email": "teste@email.com",
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 422
+
+
+def test_therapist_get_patient():
+    r = client.get("/v1/therapist/patients/pat-001", headers=AUTH_HEADER)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["id"] == "pat-001"
+    assert "sessions" in body
+    assert isinstance(body["sessions"], list)
+
+
+def test_therapist_get_patient_not_found():
+    r = client.get("/v1/therapist/patients/inexistente", headers=AUTH_HEADER)
+    assert r.status_code == 404
+
+
+def test_therapist_update_patient():
+    r = client.patch("/v1/therapist/patients/pat-001", json={
+        "therapy_goal": "Meta atualizada via teste",
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 200
+    assert r.json()["therapy_goal"] == "Meta atualizada via teste"
+
+
+def test_therapist_update_patient_invalid_anxiety():
+    r = client.patch("/v1/therapist/patients/pat-001", json={
+        "anxiety_level": "inexistente",
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 422
+
+
+def test_therapist_update_status():
+    r = client.patch("/v1/therapist/patients/pat-001/status", json={
+        "status": "paused",
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 200
+    assert r.json()["status"] == "paused"
+    # Restaurar status
+    client.patch("/v1/therapist/patients/pat-001/status", json={
+        "status": "active",
+    }, headers=AUTH_HEADER)
+
+
+def test_therapist_update_status_invalid():
+    r = client.patch("/v1/therapist/patients/pat-001/status", json={
+        "status": "invalido",
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 422
+
+
+def test_therapist_update_limit():
+    r = client.patch("/v1/therapist/patients/pat-001/limit", json={
+        "messages_limit": 250,
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 200
+    assert r.json()["messages_limit"] == 250
+
+
+def test_therapist_list_sessions():
+    r = client.get("/v1/therapist/patients/pat-001/sessions", headers=AUTH_HEADER)
+    assert r.status_code == 200
+    body = r.json()
+    assert "sessions" in body
+    assert "total" in body
+    assert isinstance(body["sessions"], list)
+
+
+def test_therapist_list_sessions_not_found():
+    r = client.get("/v1/therapist/patients/inexistente/sessions", headers=AUTH_HEADER)
+    assert r.status_code == 404
+
+
+def test_therapist_create_session():
+    r = client.post("/v1/therapist/patients/pat-001/sessions", json={
+        "date": "2025-12-01",
+        "summary": "Sessão de teste",
+        "mood": "great",
+        "topics_covered": ["teste"],
+        "homework": "Tarefa de teste",
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 201
+    body = r.json()
+    assert body["mood"] == "great"
+    assert body["patient_id"] == "pat-001"
+    assert "id" in body
+
+
+def test_therapist_create_session_invalid_mood():
+    r = client.post("/v1/therapist/patients/pat-001/sessions", json={
+        "date": "2025-12-01",
+        "summary": "Teste",
+        "mood": "invalido",
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 422
+
+
+def test_therapist_create_session_missing_fields():
+    r = client.post("/v1/therapist/patients/pat-001/sessions", json={
+        "date": "2025-12-01",
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 422
+
+
+def test_therapist_update_session():
+    # Pega uma sessão existente
+    sessions_r = client.get("/v1/therapist/patients/pat-001/sessions", headers=AUTH_HEADER)
+    session_id = sessions_r.json()["sessions"][0]["id"]
+
+    r = client.patch(f"/v1/therapist/patients/pat-001/sessions/{session_id}", json={
+        "date": "2025-12-15",
+        "summary": "Sessão editada via teste",
+        "mood": "neutral",
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 200
+    assert r.json()["summary"] == "Sessão editada via teste"
+
+
+def test_therapist_update_session_not_found():
+    r = client.patch("/v1/therapist/patients/pat-001/sessions/inexistente", json={
+        "date": "2025-12-15",
+        "summary": "Não existe",
+        "mood": "neutral",
+    }, headers=AUTH_HEADER)
+    assert r.status_code == 404
+
+
 # ─── Admin ───────────────────────────────────────────────────────────────────
 
 def test_get_storage_metrics():
