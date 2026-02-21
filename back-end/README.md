@@ -129,6 +129,21 @@ back-end/
 | `GET` | `/conversations/{id}/messages` | Buscar mensagens |
 | `POST` | `/conversations/{id}/messages` | Enviar mensagem |
 
+### Therapist — `/v1/therapist`
+
+| Método | Rota | Descrição |
+| ------ | ---- | --------- |
+| `GET` | `/overview` | Visão geral do dashboard |
+| `GET` | `/patients` | Listar pacientes (resumo) |
+| `POST` | `/patients` | Cadastrar paciente (intake) |
+| `GET` | `/patients/{id}` | Ficha completa do paciente |
+| `PATCH` | `/patients/{id}` | Atualizar dados clínicos/diretrizes |
+| `PATCH` | `/patients/{id}/status` | Alterar status (active/paused/discharged) |
+| `PATCH` | `/patients/{id}/limit` | Ajustar limite de mensagens |
+| `GET` | `/patients/{id}/sessions` | Listar sessões do paciente |
+| `POST` | `/patients/{id}/sessions` | Registrar nova sessão |
+| `PATCH` | `/patients/{id}/sessions/{sid}` | Editar sessão existente |
+
 ### Admin — `/v1/admin`
 
 | Método | Rota | Descrição |

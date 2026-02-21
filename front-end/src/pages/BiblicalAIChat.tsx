@@ -1,21 +1,16 @@
 import { useState, useEffect, useRef } from "react"
 import { ChevronLeft, BookOpen, Plus, Send, ChevronUp } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { chatApi } from "@/lib/api"
+import type { Citation } from "@/lib/api"
+import { useAuthStore } from "@/store/useAuthStore"
 
 const AVATAR_URL =
   "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80"
 
-const API_BASE = "http://localhost:8000/v1"
-// Fase 1: conversa mock fixa. Fase 2: criar conversa dinamicamente via POST /conversations.
-const CONV_ID = "conv-001"
-
 /* -------------------------------------------------------------------------- */
-/*  Tipos                                                                      */
+/*  Tipos locais                                                               */
 /* -------------------------------------------------------------------------- */
-interface Citation {
-  reference: string
-}
-
 interface Message {
   id: number
   type: "user" | "ai"
@@ -151,21 +146,6 @@ const SUGGESTIONS = [
 ]
 
 /* -------------------------------------------------------------------------- */
-/*  Utilitário: converte mensagem da API para tipo local                       */
-/* -------------------------------------------------------------------------- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function apiMsgToLocal(m: any, id: number): Message {
-  return {
-    id,
-    type: m.role === "user" ? "user" : "ai",
-    text: m.content,
-    citations: (m.citations ?? []).map((c: { reference: string }) => ({
-      reference: c.reference,
-    })),
-  }
-}
-
-/* -------------------------------------------------------------------------- */
 /*  Página BiblicalAIChat                                                      */
 /* -------------------------------------------------------------------------- */
 export function BiblicalAIChat() {
@@ -175,15 +155,19 @@ export function BiblicalAIChat() {
   const [isLoading, setIsLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // Carrega histórico ao montar
+  // Avatar do usuário autenticado
+  const avatarUrl = useAuthStore((s) => s.user?.avatar_url) ?? AVATAR_URL
+
+  // Carrega histórico ao montar o componente
   useEffect(() => {
-    fetch(`${API_BASE}/chat/conversations/${CONV_ID}/messages`)
-      .then((res) => res.json())
+    chatApi.getMessages()
       .then((data) => {
-        const loaded: Message[] = data.messages.map(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (m: any, i: number) => apiMsgToLocal(m, i + 1),
-        )
+        const loaded: Message[] = data.messages.map((m, i) => ({
+          id: i + 1,
+          type: m.role === "user" ? "user" : "ai",
+          text: m.content,
+          citations: m.citations ?? [],
+        }))
         setMessages(loaded)
       })
       .catch(() => {
@@ -213,19 +197,13 @@ export function BiblicalAIChat() {
     setIsLoading(true)
 
     try {
-      const res = await fetch(
-        `${API_BASE}/chat/conversations/${CONV_ID}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: text }),
-        },
-      )
-
-      if (!res.ok) throw new Error("Erro na resposta da API")
-
-      const data = await res.json()
-      const aiMsg = apiMsgToLocal(data.assistant_message, baseId + 2)
+      const data = await chatApi.sendMessage(text)
+      const aiMsg: Message = {
+        id: baseId + 2,
+        type: "ai",
+        text: data.assistant_message.content,
+        citations: data.assistant_message.citations ?? [],
+      }
 
       // Substitui o loading pela resposta real
       setMessages((prev) =>
@@ -270,7 +248,7 @@ export function BiblicalAIChat() {
             </div>
           </div>
           <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-blue-100">
-            <img src={AVATAR_URL} alt="Perfil do usuário" className="w-full h-full object-cover" />
+            <img src={avatarUrl} alt="Perfil do usuário" className="w-full h-full object-cover" />
           </div>
         </div>
       </header>

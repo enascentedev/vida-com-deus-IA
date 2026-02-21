@@ -21,7 +21,7 @@ Antes de executar: copiar `.env.example` para `.env` e definir ao menos `JWT_SEC
 
 ## Arquitetura
 
-Monolito modular FastAPI orientado a domínios. **Estado atual: Fase 1** — todos os endpoints retornam dados mockados, sem banco de dados.
+Monolito modular FastAPI orientado a domínios. **Estado atual: Fase 1.5** — endpoints principais persistem dados em arquivos JSON locais (`data/`). Chat integrado ao GPT-4o-mini com fallback mock.
 
 ### Camadas existentes
 
@@ -30,14 +30,22 @@ app/
 ├── main.py              # Ponto de entrada: CORS, montagem dos routers, /health
 ├── api/
 │   ├── router.py        # Agrega todos os domínios sob /v1
-│   └── v1/              # Um arquivo por domínio (auth, users, posts, library, chat, admin)
+│   └── v1/              # Um arquivo por domínio (auth, users, posts, library, chat, admin, therapist)
 ├── core/
 │   ├── config.py        # Pydantic Settings — lê variáveis do .env
 │   ├── security.py      # create_access_token / create_refresh_token / decode_token (JWT)
-│   └── dependencies.py  # get_current_user_id / require_current_user_id (Depends)
+│   ├── dependencies.py  # get_current_user_id / require_current_user_id (Depends)
+│   ├── storage.py       # read_json / write_json / append_etl_run / get_etl_runs
+│   └── scraper.py       # ETL de scraping do wgospel.com/tempoderefletir/
 └── domain/
     └── <domínio>/
         └── schemas.py   # Schemas Pydantic de request e response do domínio
+data/                    # Persistência JSON local (Fase 1.5)
+├── posts.json           # Posts coletados pelo ETL
+├── patients.json        # Pacientes do dashboard do psicólogo
+├── favorites.json       # Favoritos da biblioteca por usuário
+├── users.json           # Perfil do usuário autenticado
+└── etl_runs.json        # Histórico das execuções de ETL (últimas 20)
 ```
 
 ### Camadas planejadas (Fase 2)
@@ -68,6 +76,7 @@ app/
 | `JWT_SECRET_KEY` | Sim | Chave secreta JWT (trocar em produção) |
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | Não | Padrão: 15 |
 | `JWT_REFRESH_TOKEN_EXPIRE_DAYS` | Não | Padrão: 7 |
+| `OPENAI_API_KEY` | Não (fallback mock) | Chave da API OpenAI para o chat bíblico |
 | `DATABASE_URL` | Fase 2 | `postgresql+psycopg://...` |
 | `REDIS_URL` | Fase 2 | `redis://localhost:6379/0` |
 

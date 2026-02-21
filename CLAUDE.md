@@ -61,11 +61,15 @@ Ao alterar componentes em `vida-com-deus-ui`, rebuilde a biblioteca antes de tes
 | `/chat` | BiblicalAIChat |
 | `/biblioteca` | Favorites |
 | `/configuracoes` | AccountSettings |
+| `/gestao` | TherapistDashboard (layout + Outlet) |
+| `/gestao/pacientes` | PatientListView |
+| `/gestao/pacientes/:id` | PatientDetail |
+| `/gestao/intake` | PatientIntakeForm |
 | `/admin` | AdminDatabaseMonitor |
 
 ### Layout Compartilhado
 
-- `src/components/layout/BottomNavigation.tsx` — nav inferior (Home, Chat, Biblioteca, Admin)
+- `src/components/layout/BottomNavigation.tsx` — nav inferior (Home, Chat, Biblioteca, Gestão, Admin)
 - `src/components/layout/SecondaryTopbar.tsx` — topbar com botão voltar (páginas internas)
 
 ### Padrões Visuais
@@ -106,15 +110,24 @@ Documentação interativa disponível em `http://localhost:8000/docs` (Swagger U
 
 ### Camadas
 
-**Estado atual (Fase 1):** Todos os endpoints retornam dados mockados. Banco de dados e Redis planejados para Fase 2.
+**Estado atual (Fase 1.5):** Endpoints principais persistem dados em arquivos JSON locais (`data/`).
+Chat bíblico integrado ao GPT-4o-mini (fallback mock quando `OPENAI_API_KEY` ausente).
+Banco de dados (PostgreSQL) e Redis planejados para Fase 2.
 
 ```text
 app/
-├── api/v1/          # Routers FastAPI (auth, users, posts, library, chat, admin)
-├── core/            # config.py (Pydantic Settings), security.py (JWT), dependencies.py
+├── api/v1/          # Routers FastAPI (auth, users, posts, library, chat, admin, therapist)
+├── core/            # config.py (Pydantic Settings), security.py (JWT), dependencies.py,
+│                    # storage.py (leitura/escrita JSON), scraper.py (ETL wgospel.com)
 ├── domain/          # Schemas Pydantic por domínio (sem lógica de negócio)
 ├── services/        # Lógica de negócio (planejado — Fase 2)
 └── repositories/    # Acesso a dados (planejado — Fase 2)
+data/                # Persistência JSON local (Fase 1.5)
+├── posts.json       # Posts coletados pelo ETL
+├── patients.json    # Pacientes do dashboard do psicólogo
+├── favorites.json   # Favoritos da biblioteca por usuário
+├── users.json       # Perfil do usuário autenticado
+└── etl_runs.json    # Histórico das execuções de ETL (últimas 20)
 ```
 
 **Roteamento:** `app/api/router.py` agrega todos os domínios sob o prefixo `/v1`. Ponto de entrada: `app/main.py`.
@@ -132,6 +145,7 @@ app/
 | Posts | `GET /v1/posts/feed`, `GET /v1/posts/{id}`, `GET /v1/posts/{id}/audio` |
 | Biblioteca | `GET /v1/library/`, `POST/DELETE /v1/library/favorites/{id}` |
 | Chat | `POST/GET /v1/chat/conversations`, `POST/GET /v1/chat/conversations/{id}/messages` |
+| Therapist | `GET /v1/therapist/overview`, `GET/POST /v1/therapist/patients`, `GET/PATCH /v1/therapist/patients/{id}`, `PATCH .../status`, `PATCH .../limit`, `GET/POST .../sessions`, `PATCH .../sessions/{sid}` |
 | Admin | `GET /v1/admin/metrics/storage`, `GET /v1/admin/alerts`, `POST /v1/admin/etl/runs/execute` |
 | Health | `GET /health` |
 

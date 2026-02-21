@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { KeyRound, Mail, Check, RefreshCw } from "lucide-react"
+import { authApi } from "@/lib/api"
 import { Button, Input } from "vida-com-deus-ui"
 import { SecondaryTopbar } from "@/components/layout/SecondaryTopbar"
 
@@ -40,10 +41,34 @@ function SuccessBanner({ onResend }: { onResend: () => void }) {
 /* -------------------------------------------------------------------------- */
 export function PasswordRecovery() {
   const [sent, setSent] = useState(false)
+  const [email, setEmail] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setSent(true)
+    setError(null)
+    setIsLoading(true)
+    try {
+      await authApi.forgotPassword(email)
+      setSent(true)
+    } catch {
+      setError("Não foi possível enviar o e-mail. Tente novamente.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  async function handleResend() {
+    setError(null)
+    setIsLoading(true)
+    try {
+      await authApi.forgotPassword(email)
+    } catch {
+      setError("Não foi possível reenviar o e-mail. Tente novamente.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -80,16 +105,25 @@ export function PasswordRecovery() {
                 placeholder="nome@exemplo.com"
                 className="h-14 pl-12"
                 required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
             </div>
           </label>
 
-          <Button type="submit" className="w-full h-14 rounded-xl text-lg font-bold mt-4 active:scale-[0.98] transition-all duration-200 shadow-[0_4px_20px_-4px_rgb(37_99_235/0.30)]">
-            Enviar Instruções
+          {/* Mensagem de erro */}
+          {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+
+          <Button
+            type="submit"
+            className="w-full h-14 rounded-xl text-lg font-bold mt-4 active:scale-[0.98] transition-all duration-200 shadow-[0_4px_20px_-4px_rgb(37_99_235/0.30)]"
+            disabled={isLoading}
+          >
+            {isLoading ? "Enviando..." : "Enviar Instruções"}
           </Button>
         </form>
 
-        {sent && <SuccessBanner onResend={() => {}} />}
+        {sent && <SuccessBanner onResend={handleResend} />}
 
         {/* Rodapé */}
         <div className="mt-auto pb-10 text-center pt-12">

@@ -1,0 +1,302 @@
+[
+  {
+    "id": "pat-001",
+    "name": "Ana Beatriz Souza",
+    "email": "ana.beatriz@email.com",
+    "status": "active",
+    "created_at": "2025-09-10T08:00:00Z",
+    "chief_complaint": "Ansiedade frequente e dificuldade para dormir",
+    "anxiety_level": "moderate",
+    "depression_level": "mild",
+    "sleep_quality": "poor",
+    "suicidal_ideation": false,
+    "current_medication": "Sertralina 50mg",
+    "therapy_goal": "Meta atualizada via teste",
+    "therapeutic_approach": "Terapia Cognitivo-Comportamental",
+    "focus_topics": [
+      "ansiedade",
+      "sono",
+      "autoestima"
+    ],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 87,
+    "messages_limit": 250,
+    "sessions": [
+      {
+        "id": "sess-001",
+        "patient_id": "pat-001",
+        "date": "2025-12-15",
+        "summary": "Sessão editada via teste",
+        "mood": "neutral",
+        "topics_covered": [],
+        "homework": null,
+        "next_session_date": null,
+        "created_at": "2025-11-01T14:00:00Z"
+      },
+      {
+        "id": "sess-002",
+        "patient_id": "pat-001",
+        "date": "2025-11-15",
+        "summary": "Discutimos gatilhos de ansiedade no trabalho. Reestruturação cognitiva aplicada.",
+        "mood": "neutral",
+        "topics_covered": [
+          "ansiedade",
+          "trabalho",
+          "pensamentos automáticos"
+        ],
+        "homework": "Diário de pensamentos automáticos",
+        "next_session_date": "2025-11-29",
+        "created_at": "2025-11-15T14:00:00Z"
+      },
+      {
+        "id": "sess-c3fe6054",
+        "patient_id": "pat-001",
+        "created_at": "2026-02-21T04:41:16.477797Z",
+        "date": "2025-12-01",
+        "summary": "Sessão de teste",
+        "mood": "great",
+        "topics_covered": [
+          "teste"
+        ],
+        "homework": "Tarefa de teste",
+        "next_session_date": null
+      },
+      {
+        "id": "sess-d4e1b6c7",
+        "patient_id": "pat-001",
+        "created_at": "2026-02-21T04:53:42.781342Z",
+        "date": "2025-12-01",
+        "summary": "Sessão de teste",
+        "mood": "great",
+        "topics_covered": [
+          "teste"
+        ],
+        "homework": "Tarefa de teste",
+        "next_session_date": null
+      }
+    ]
+  },
+  {
+    "id": "pat-002",
+    "name": "Pedro Henrique Lima",
+    "email": "pedro.lima@email.com",
+    "status": "paused",
+    "created_at": "2025-08-20T10:00:00Z",
+    "chief_complaint": "Luto pela perda de familiar",
+    "anxiety_level": "mild",
+    "depression_level": "moderate",
+    "sleep_quality": "fair",
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": "Elaboração do luto e fortalecimento emocional",
+    "therapeutic_approach": "Abordagem Humanista",
+    "focus_topics": [
+      "luto",
+      "família",
+      "espiritualidade"
+    ],
+    "avoid_topics": [
+      "detalhes do falecimento"
+    ],
+    "response_depth": "detailed",
+    "messages_used": 42,
+    "messages_limit": 200,
+    "sessions": [
+      {
+        "id": "sess-003",
+        "patient_id": "pat-002",
+        "date": "2025-10-05",
+        "summary": "Sessão focada em memórias positivas do familiar. Paciente chorou mas sentiu alívio.",
+        "mood": "low",
+        "topics_covered": [
+          "luto",
+          "memórias",
+          "aceitação"
+        ],
+        "homework": "Escrever carta para o familiar",
+        "next_session_date": "2025-10-19",
+        "created_at": "2025-10-05T10:00:00Z"
+      }
+    ]
+  },
+  {
+    "id": "pat-003",
+    "name": "Maria Clara Santos",
+    "email": "maria.clara@email.com",
+    "status": "active",
+    "created_at": "2025-10-01T09:00:00Z",
+    "chief_complaint": "Baixa autoestima e dificuldade em relacionamentos",
+    "anxiety_level": "mild",
+    "depression_level": "none",
+    "sleep_quality": "good",
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": "Fortalecer autoestima e melhorar comunicação interpessoal",
+    "therapeutic_approach": "Terapia Cognitivo-Comportamental",
+    "focus_topics": [
+      "autoestima",
+      "relacionamentos",
+      "comunicação"
+    ],
+    "avoid_topics": [],
+    "response_depth": "brief",
+    "messages_used": 15,
+    "messages_limit": 50,
+    "sessions": [
+      {
+        "id": "sess-004",
+        "patient_id": "pat-003",
+        "date": "2025-10-15",
+        "summary": "Primeira sessão. Anamnese inicial e estabelecimento de vínculo terapêutico.",
+        "mood": "neutral",
+        "topics_covered": [
+          "anamnese",
+          "expectativas",
+          "vínculo"
+        ],
+        "homework": null,
+        "next_session_date": "2025-10-29",
+        "created_at": "2025-10-15T09:00:00Z"
+      },
+      {
+        "id": "sess-005",
+        "patient_id": "pat-003",
+        "date": "2025-10-29",
+        "summary": "Trabalhamos crenças centrais sobre autoestima. Paciente engajada.",
+        "mood": "good",
+        "topics_covered": [
+          "autoestima",
+          "crenças centrais",
+          "autoconhecimento"
+        ],
+        "homework": "Listar 3 qualidades pessoais diariamente",
+        "next_session_date": "2025-11-12",
+        "created_at": "2025-10-29T09:00:00Z"
+      },
+      {
+        "id": "sess-006",
+        "patient_id": "pat-003",
+        "date": "2025-11-12",
+        "summary": "Revisão do exercício de qualidades. Paciente relatou melhora significativa.",
+        "mood": "great",
+        "topics_covered": [
+          "autoestima",
+          "progresso",
+          "assertividade"
+        ],
+        "homework": "Praticar comunicação assertiva em uma situação social",
+        "next_session_date": "2025-11-26",
+        "created_at": "2025-11-12T09:00:00Z"
+      }
+    ]
+  },
+  {
+    "id": "pat-0fd6006f",
+    "name": "Teste Criação",
+    "email": "teste@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T04:41:15.898176Z",
+    "chief_complaint": "Queixa de teste",
+    "anxiety_level": "mild",
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 50,
+    "sessions": []
+  },
+  {
+    "id": "pat-6fdbe8d7",
+    "name": "Com Sessão",
+    "email": "sessao@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T04:41:15.958203Z",
+    "chief_complaint": null,
+    "anxiety_level": null,
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 100,
+    "sessions": [
+      {
+        "id": "sess-2a15c952",
+        "patient_id": "pat-6fdbe8d7",
+        "date": "2025-12-01",
+        "summary": "Sessão inicial",
+        "mood": "good",
+        "topics_covered": [],
+        "homework": null,
+        "next_session_date": null,
+        "created_at": "2026-02-21T04:41:15.958203Z"
+      }
+    ]
+  },
+  {
+    "id": "pat-eb6544d0",
+    "name": "Teste Criação",
+    "email": "teste@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T04:53:42.289017Z",
+    "chief_complaint": "Queixa de teste",
+    "anxiety_level": "mild",
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 50,
+    "sessions": []
+  },
+  {
+    "id": "pat-08f71299",
+    "name": "Com Sessão",
+    "email": "sessao@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T04:53:42.352989Z",
+    "chief_complaint": null,
+    "anxiety_level": null,
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 100,
+    "sessions": [
+      {
+        "id": "sess-d0b6c242",
+        "patient_id": "pat-08f71299",
+        "date": "2025-12-01",
+        "summary": "Sessão inicial",
+        "mood": "good",
+        "topics_covered": [],
+        "homework": null,
+        "next_session_date": null,
+        "created_at": "2026-02-21T04:53:42.352989Z"
+      }
+    ]
+  }
+]

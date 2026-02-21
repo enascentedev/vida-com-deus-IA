@@ -1,8 +1,10 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Heart, Share2, Play, CheckCircle, BookOpen, Sparkles } from "lucide-react"
-import { Badge } from "vida-com-deus-ui"
+import { useParams, useNavigate } from "react-router-dom"
+import { postsApi, libraryApi } from "@/lib/api"
+import type { PostDetail as PostDetailType } from "@/lib/api"
+import { Badge, Skeleton } from "vida-com-deus-ui"
 import { SecondaryTopbar } from "@/components/layout/SecondaryTopbar"
-import { useNavigate } from "react-router-dom"
 
 const THUMB_URL =
   "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=200&q=80"
@@ -10,15 +12,13 @@ const THUMB_URL =
 /* -------------------------------------------------------------------------- */
 /*  Player de Áudio                                                            */
 /* -------------------------------------------------------------------------- */
-function AudioPlayer() {
-  const [playing, setPlaying] = useState(false)
-
+function AudioPlayer({ thumbnailUrl, duration, audioUrl }: { thumbnailUrl: string | null; duration: string | null; audioUrl: string | null }) {
   return (
     <div className="mx-4 my-3 flex flex-col gap-3 rounded-2xl bg-white/95 backdrop-blur-sm border border-slate-100 px-4 py-3 shadow-sm transition-shadow duration-200 hover:shadow-[0_4px_24px_-4px_rgb(37_99_235/0.10)]">
       <div className="flex items-center gap-4 overflow-hidden">
         <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl">
           <img
-            src={THUMB_URL}
+            src={thumbnailUrl ?? THUMB_URL}
             alt="Capa do áudio"
             className="h-full w-full object-cover"
           />
@@ -27,15 +27,17 @@ function AudioPlayer() {
           <p className="text-slate-900 text-base font-bold leading-tight truncate">
             Devocional em Áudio
           </p>
-          <p className="text-slate-400 text-sm truncate">Vida com Deus • 5 min</p>
+          <p className="text-slate-400 text-sm truncate">Vida com Deus • {duration ?? "5 min"}</p>
         </div>
-        <button
-          onClick={() => setPlaying((v) => !v)}
+        <a
+          href={audioUrl ?? "#"}
+          target="_blank"
+          rel="noopener noreferrer"
           className="flex shrink-0 items-center justify-center rounded-full size-12 bg-blue-600 text-white shadow-lg shadow-blue-600/20 transition-all duration-200 hover:shadow-xl hover:shadow-blue-600/30 active:scale-95"
-          aria-label={playing ? "Pausar áudio" : "Reproduzir áudio"}
+          aria-label="Reproduzir áudio"
         >
           <Play size={20} className="fill-white" />
-        </button>
+        </a>
       </div>
 
       {/* Barra de Progresso */}
@@ -61,11 +63,7 @@ function AudioPlayer() {
 /* -------------------------------------------------------------------------- */
 type Tab = "resumo" | "tags" | "devocional"
 
-interface TabContentSummaryProps {
-  text: string
-}
-
-function TabContentSummary({ text }: TabContentSummaryProps) {
+function TabContentSummary({ post }: { post: PostDetailType }) {
   return (
     <div className="p-5">
       <div className="flex items-center gap-2 mb-3">
@@ -74,39 +72,23 @@ function TabContentSummary({ text }: TabContentSummaryProps) {
           AI Insights
         </span>
       </div>
-      <p className="text-slate-700 text-base font-normal leading-relaxed">{text}</p>
+      <p className="text-slate-700 text-base font-normal leading-relaxed">{post.ai_summary}</p>
       <div className="mt-6 pt-6 border-t border-slate-100">
         <p className="text-sm font-bold text-slate-900 mb-3">Pontos-Chave</p>
         <ul className="space-y-3">
-          <li className="flex items-start gap-3">
-            <CheckCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
-            <span className="text-sm text-slate-600">O amor de Deus é ativo e sacrificial.</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <CheckCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
-            <span className="text-sm text-slate-600">A fé é a ponte para a vida eterna.</span>
-          </li>
-          <li className="flex items-start gap-3">
-            <CheckCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
-            <span className="text-sm text-slate-600">
-              A salvação é um dom acessível a todos.
-            </span>
-          </li>
+          {post.key_points.map((kp, i) => (
+            <li key={i} className="flex items-start gap-3">
+              <CheckCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
+              <span className="text-sm text-slate-600">{kp.text}</span>
+            </li>
+          ))}
         </ul>
       </div>
     </div>
   )
 }
 
-function TabContentTags() {
-  const tags = [
-    "#Salvação",
-    "#AmorDeDeus",
-    "#VidaEterna",
-    "#EvangelhoDeJoão",
-    "#Fé",
-    "#Graça",
-  ]
+function TabContentTags({ tags }: { tags: string[] }) {
   return (
     <div className="p-5">
       <p className="text-sm font-bold text-slate-900 mb-3">Tópicos Relacionados</p>
@@ -116,7 +98,7 @@ function TabContentTags() {
             key={tag}
             className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-full text-xs font-medium border border-slate-200 transition-all duration-150 hover:border-blue-600/30 hover:bg-blue-50 hover:text-blue-700 cursor-pointer"
           >
-            {tag}
+            #{tag}
           </span>
         ))}
       </div>
@@ -124,22 +106,43 @@ function TabContentTags() {
   )
 }
 
-function TabContentDevocional() {
+function TabContentDevocional({ meditation, prayer }: { meditation: string; prayer: string }) {
   return (
     <div className="p-5">
-      <p className="text-slate-700 text-base leading-relaxed">
-        Medite neste versículo ao longo do dia. Deixe que o amor de Deus descrito em João
-        3:16 inspire suas ações e relacionamentos. Pratique a gratidão pela dádiva da
-        salvação e compartilhe essa mensagem com quem está ao seu redor.
-      </p>
+      <p className="text-slate-700 text-base leading-relaxed">{meditation}</p>
       <div className="mt-6 p-4 rounded-xl bg-blue-50 border border-blue-100">
         <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-2">
           Oração do Dia
         </p>
-        <p className="text-sm text-slate-700 italic leading-relaxed">
-          "Senhor, obrigado pelo Teu amor incomparável. Que eu possa refletir esse amor em
-          todas as minhas atitudes hoje. Amém."
-        </p>
+        <p className="text-sm text-slate-700 italic leading-relaxed">"{prayer}"</p>
+      </div>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Skeleton da página                                                         */
+/* -------------------------------------------------------------------------- */
+function PostDetailSkeleton() {
+  return (
+    <div className="flex min-h-screen flex-col bg-slate-50 pb-20">
+      <div className="mx-4 my-3 flex items-center gap-4 rounded-2xl bg-white border border-slate-100 px-4 py-3 shadow-sm">
+        <Skeleton className="h-14 w-14 rounded-xl shrink-0" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+        <Skeleton className="h-12 w-12 rounded-full shrink-0" />
+      </div>
+      <div className="px-4 pt-2 space-y-2">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-4 w-32" />
+      </div>
+      <div className="px-4 mt-6">
+        <Skeleton className="h-32 w-full rounded-2xl" />
+      </div>
+      <div className="px-4 mt-6">
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     </div>
   )
@@ -149,9 +152,40 @@ function TabContentDevocional() {
 /*  Página PostDetail                                                          */
 /* -------------------------------------------------------------------------- */
 export function PostDetail() {
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<Tab>("resumo")
-  const [liked, setLiked] = useState(false)
+  const [post, setPost] = useState<PostDetailType | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isFavorited, setIsFavorited] = useState(false)
+
+  // Carrega os dados do post ao montar o componente
+  useEffect(() => {
+    if (!id) return
+    let cancelled = false
+    postsApi.getPost(id)
+      .then((data) => { if (!cancelled) setPost(data) })
+      .catch(() => { /* tratar erro — manter isLoading false */ })
+      .finally(() => { if (!cancelled) setIsLoading(false) })
+    return () => { cancelled = true }
+  }, [id])
+
+  // Toggle de favorito com update otimista
+  async function handleFavoriteToggle() {
+    if (!post) return
+    setIsFavorited((v) => !v)
+    try {
+      if (isFavorited) {
+        await libraryApi.removeFavorite(post.id)
+      } else {
+        await libraryApi.addFavorite(post.id)
+      }
+    } catch {
+      setIsFavorited((v) => !v) // reverte em caso de erro
+    }
+  }
+
+  if (isLoading) return <PostDetailSkeleton />
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 pb-20">
@@ -160,13 +194,13 @@ export function PostDetail() {
         rightSlot={
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setLiked((v) => !v)}
-              aria-label={liked ? "Remover dos favoritos" : "Adicionar aos favoritos"}
+              onClick={handleFavoriteToggle}
+              aria-label={isFavorited ? "Remover dos favoritos" : "Adicionar aos favoritos"}
               className="transition-transform duration-200 hover:scale-110 active:scale-95"
             >
               <Heart
                 size={22}
-                className={liked ? "fill-blue-600 text-blue-600" : "text-slate-400"}
+                className={isFavorited ? "fill-blue-600 text-blue-600" : "text-slate-400"}
               />
             </button>
             <button aria-label="Compartilhar" className="transition-transform duration-200 hover:scale-110 active:scale-95">
@@ -178,18 +212,22 @@ export function PostDetail() {
 
       <main className="flex-1 overflow-y-auto">
         {/* Player */}
-        <AudioPlayer />
+        <AudioPlayer
+          thumbnailUrl={post?.thumbnail_url ?? null}
+          duration={post?.audio_duration ?? null}
+          audioUrl={post?.audio_url ?? null}
+        />
 
         {/* Título */}
         <div className="px-4 pt-2">
           <h1 className="text-slate-900 text-[28px] font-bold leading-tight pb-2">
-            João 3:16 — O Amor de Deus
+            {post?.title ?? ""}
           </h1>
           <div className="flex items-center gap-2 mb-4">
             <Badge className="text-xs font-semibold px-2 py-0.5 bg-blue-600/10 text-blue-600 border-none hover:bg-blue-600/10">
-              Novo Testamento
+              {post?.category ?? ""}
             </Badge>
-            <span className="text-xs text-slate-400">24 de junho, 2024</span>
+            <span className="text-xs text-slate-400">{post?.date ?? ""}</span>
           </div>
         </div>
 
@@ -197,40 +235,44 @@ export function PostDetail() {
         <div className="px-4 mb-6">
           <div className="bg-white rounded-2xl p-6 border-l-4 border-blue-600 shadow-sm transition-all duration-200 hover:shadow-[0_4px_20px_-4px_rgb(37_99_235/0.12)] hover:-translate-y-0.5">
             <p className="text-slate-900 text-xl font-medium italic leading-relaxed">
-              "Porque Deus amou o mundo de tal maneira que deu o seu Filho unigênito, para
-              que todo aquele que nele crê não pereça, mas tenha a vida eterna."
+              "{post?.verse_content ?? ""}"
             </p>
             <p className="text-blue-600 font-bold text-sm mt-4 text-right">
-              — João 3:16, NVI
+              — {post?.reference ?? ""}
             </p>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="px-4">
-          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-            <div className="flex border-b border-slate-100 p-1 gap-1">
-              {(["resumo", "tags", "devocional"] as Tab[]).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`flex flex-1 items-center justify-center py-2.5 px-1 text-sm font-bold rounded-xl transition-all duration-200 ${
-                    activeTab === tab
-                      ? "bg-slate-50 text-blue-600 shadow-sm"
-                      : "text-slate-400 hover:text-slate-600"
-                  }`}
-                >
-                  {tab === "resumo" ? "Resumo" : tab === "tags" ? "Tags" : "Devocional"}
-                </button>
-              ))}
+        {post && (
+          <div className="px-4">
+            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+              <div className="flex border-b border-slate-100 p-1 gap-1">
+                {(["resumo", "tags", "devocional"] as Tab[]).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex flex-1 items-center justify-center py-2.5 px-1 text-sm font-bold rounded-xl transition-all duration-200 ${
+                      activeTab === tab
+                        ? "bg-slate-50 text-blue-600 shadow-sm"
+                        : "text-slate-400 hover:text-slate-600"
+                    }`}
+                  >
+                    {tab === "resumo" ? "Resumo" : tab === "tags" ? "Tags" : "Devocional"}
+                  </button>
+                ))}
+              </div>
+              {activeTab === "resumo" && <TabContentSummary post={post} />}
+              {activeTab === "tags" && <TabContentTags tags={post.tags} />}
+              {activeTab === "devocional" && (
+                <TabContentDevocional
+                  meditation={post.devotional_meditation}
+                  prayer={post.devotional_prayer}
+                />
+              )}
             </div>
-            {activeTab === "resumo" && (
-              <TabContentSummary text="Este versículo encapsula o núcleo da fé cristã: o amor sacrificial de Deus. Ele destaca que a salvação é um dom acessível a todos por meio da fé, transitando da morte espiritual para a vida eterna." />
-            )}
-            {activeTab === "tags" && <TabContentTags />}
-            {activeTab === "devocional" && <TabContentDevocional />}
           </div>
-        </div>
+        )}
       </main>
 
       {/* FAB - Chat com IA */}

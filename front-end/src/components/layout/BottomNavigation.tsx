@@ -1,7 +1,7 @@
-import { Home, MessageSquare, Bookmark, Settings } from "lucide-react"
+import { Home, MessageSquare, Bookmark, ClipboardList, Settings } from "lucide-react"
 import { useNavigate, useLocation } from "react-router-dom"
 
-type NavTab = "home" | "chat" | "library" | "admin"
+type NavTab = "home" | "chat" | "library" | "gestao" | "admin"
 
 interface NavItemProps {
   icon: React.ReactNode
@@ -44,10 +44,15 @@ const ROUTE_TO_TAB: Record<string, NavTab> = {
   "/admin": "admin",
 }
 
+function resolveActiveTab(pathname: string): NavTab {
+  if (pathname.startsWith("/gestao")) return "gestao"
+  return ROUTE_TO_TAB[pathname] ?? "home"
+}
+
 export function BottomNavigation() {
   const navigate = useNavigate()
   const location = useLocation()
-  const activeTab: NavTab = ROUTE_TO_TAB[location.pathname] ?? "home"
+  const activeTab = resolveActiveTab(location.pathname)
 
   return (
     <nav className="sticky bottom-0 z-50 flex items-center border-t border-slate-100 bg-white/90 backdrop-blur-xl px-2 pb-safe">
@@ -74,6 +79,15 @@ export function BottomNavigation() {
         icon={<Bookmark size={22} />}
         iconActive={<Bookmark size={22} className="fill-blue-600 stroke-blue-600" />}
         onClick={() => navigate("/biblioteca")}
+      />
+      {/* TODO Fase 2: renderização condicional por role (useAuthStore) */}
+      <NavItem
+        tab="gestao"
+        activeTab={activeTab}
+        label="Gestão"
+        icon={<ClipboardList size={22} />}
+        iconActive={<ClipboardList size={22} className="fill-blue-600 stroke-blue-600" />}
+        onClick={() => navigate("/gestao")}
       />
       <NavItem
         tab="admin"

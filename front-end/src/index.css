@@ -61,6 +61,35 @@
   --animate-slide-down: slide-down 0.3s ease-out both;
 }
 
+/* ── Dark Mode — overrides das classes explícitas do app ─────────────────── */
+/* Regras fora de @layer têm precedência sobre @layer utilities do Tailwind.  */
+
+.dark body {
+  background-color: hsl(222 47% 7%);
+  color: hsl(210 40% 95%);
+}
+
+/* Backgrounds */
+.dark .bg-slate-50  { background-color: hsl(222 47% 9%); }
+.dark .bg-white     { background-color: hsl(222 47% 11%); }
+.dark .bg-slate-100 { background-color: hsl(222 47% 14%); }
+
+/* Texto */
+.dark .text-slate-900 { color: hsl(210 40% 95%); }
+.dark .text-slate-800 { color: hsl(210 40% 90%); }
+.dark .text-slate-700 { color: hsl(210 40% 82%); }
+.dark .text-slate-600 { color: hsl(210 40% 75%); }
+.dark .text-slate-500 { color: hsl(210 40% 60%); }
+.dark .text-slate-400 { color: hsl(210 40% 50%); }
+
+/* Bordas */
+.dark .border-slate-100 { border-color: hsl(217 32% 20%); }
+.dark .border-slate-200 { border-color: hsl(217 32% 24%); }
+
+/* Topbar / nav com backdrop */
+.dark .bg-white\/80 { background-color: hsl(222 47% 11% / 0.8); }
+.dark .bg-white\/90 { background-color: hsl(222 47% 11% / 0.9); }
+
 /* Hide scrollbar cross-browser */
 .scrollbar-none {
   scrollbar-width: none;

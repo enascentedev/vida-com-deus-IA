@@ -1,3 +1,5 @@
+import os
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
@@ -15,6 +17,14 @@ from app.domain.chat.schemas import (
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
+# ── Prompt de sistema — especialista bíblico ──────────────────────────────────
+SYSTEM_PROMPT = """Você é um especialista em Bíblia Sagrada com profundo conhecimento das escrituras cristãs.
+Responda sempre em Português do Brasil de forma pastoral, respeitosa e edificante.
+Ao citar versículos, indique o livro, capítulo e versículo (ex.: "João 3:16").
+Baseie suas respostas exclusivamente nas escrituras bíblicas.
+Seja conciso, claro e espiritualmente enriquecedor."""
+
+# ── Dados mock (conversa inicial) ─────────────────────────────────────────────
 MOCK_CONVERSATION = Conversation(
     id="conv-001",
     user_id="user-mock-001",
@@ -55,11 +65,48 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+# ── Integração OpenAI ─────────────────────────────────────────────────────────
+
+def _call_openai(user_message: str) -> tuple[str, list[Citation]]:
+    """
+    Chama o GPT-4o-mini com o prompt bíblico.
+    Retorna (conteúdo da resposta, lista de citações extraídas).
+    Faz fallback para resposta mock se a chave não estiver configurada.
+    """
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        # Fallback mock quando a chave não está configurada
+        return (
+            "Com base na sua pergunta, posso compartilhar que a Bíblia oferece "
+            "sabedoria profunda sobre este tema. "
+            "Provérbios 3:5-6 nos instrui a confiar no Senhor de todo o coração "
+            "e não nos apoiar no nosso próprio entendimento.",
+            [Citation(reference="Provérbios 3:5-6", book="Provérbios", chapter=3, verse="5-6")],
+        )
+
+    from openai import OpenAI  # Import local para evitar erro se não instalado
+
+    client = OpenAI(api_key=api_key)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
+        max_tokens=600,
+        temperature=0.7,
+    )
+    content = response.choices[0].message.content or ""
+    return content, []  # Citações extraídas do texto — simplificado para Fase 1
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
 @router.post("/conversations", response_model=Conversation, status_code=201)
 def create_conversation(user_id: str = Depends(get_current_user_id)) -> Conversation:
     """Cria uma nova conversa."""
     return Conversation(
-        id="conv-new-001",
+        id=f"conv-{uuid.uuid4().hex[:8]}",
         user_id=user_id,
         created_at=_now_iso(),
         message_count=0,
@@ -96,26 +143,25 @@ def send_message(
     body: SendMessageRequest,
     user_id: str = Depends(get_current_user_id),
 ) -> SendMessageResponse:
-    """Envia uma mensagem e recebe resposta da IA."""
+    """Envia uma mensagem e recebe resposta real do GPT-4o-mini."""
+    now = _now_iso()
+
     user_msg = ChatMessage(
-        id=f"msg-user-{_now_iso()}",
+        id=f"msg-user-{uuid.uuid4().hex[:8]}",
         role="user",
         content=body.content,
         citations=[],
-        created_at=_now_iso(),
+        created_at=now,
     )
+
+    ai_content, citations = _call_openai(body.content)
+
     assistant_msg = ChatMessage(
-        id=f"msg-ai-{_now_iso()}",
+        id=f"msg-ai-{uuid.uuid4().hex[:8]}",
         role="assistant",
-        content=(
-            "Com base na sua pergunta, posso compartilhar que a Bíblia oferece "
-            "sabedoria profunda sobre este tema. "
-            "Provérbios 3:5-6 nos instrui a confiar no Senhor de todo o coração "
-            "e não nos apoiar no nosso próprio entendimento."
-        ),
-        citations=[
-            Citation(reference="Provérbios 3:5-6", book="Provérbios", chapter=3, verse="5-6"),
-        ],
+        content=ai_content,
+        citations=citations,
         created_at=_now_iso(),
     )
+
     return SendMessageResponse(user_message=user_msg, assistant_message=assistant_msg)
