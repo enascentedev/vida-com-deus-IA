@@ -1128,3 +1128,64 @@ Referencias:
 
 - `back-end/app/core/storage.py` — utilitario centralizado de JSON.
 - `back-end/app/api/v1/users.py` e `library.py` — implementacao.
+
+---
+
+### [2026-02-21] Migracao para PostgreSQL com SQLAlchemy 2.0 e Alembic
+
+Motivo da Criacao:
+
+- A persistencia em arquivos JSON locais (Fase 1.5) nao suporta concorrencia, nao oferece
+  integridade referencial e nao e adequada para producao. A Fase 2 substitui essa camada por
+  PostgreSQL real com ORM, repositorios e migracoes versionadas, preparando o back-end para
+  escala e autenticacao real com senhas hasheadas.
+
+Escopo:
+
+- Back-end: `app/models/`, `app/repositories/`, `app/services/`, `app/core/database.py`,
+  `migrations/`, `back-end/docs/decisoes-fase2.md`, `back-end/.env.example`,
+  `back-end/pyproject.toml`, `tests/contract/test_endpoints.py`.
+
+Impacto:
+
+- Adicionadas 4 camadas ao back-end: modelos SQLAlchemy, repositorios, servicos e migracoes.
+- Engine async (`create_async_engine`) com sessao injetavel via `Depends(get_db)`.
+- 4 modelos de usuario: `User`, `RefreshToken`, `PasswordResetToken`, `UserSettings`.
+- 2 modelos de post: `Post`, `PostTag`.
+- 4 modelos de biblioteca e chat: `Favorite`, `ReadingHistory`, `Conversation`, `Message`.
+- 3 migracoes Alembic encadeadas cobrindo todos os dominios.
+- Hash de senhas com Argon2 via `passlib[argon2]`.
+- Testes de contrato refatorados: `get_db` e `get_current_user_id` mockados via
+  `dependency_overrides` — 50+ casos, sem dependencia de banco nos testes de contrato.
+- Decisoes arquiteturais documentadas em `back-end/docs/decisoes-fase2.md`.
+
+Riscos:
+
+- Requer PostgreSQL 15+ instalado e configurado no `.env` (`DATABASE_URL`).
+- Endpoints ainda usam persistencia JSON para alguns dominios (therapist, admin ETL) —
+  migracao completa para repositorios ocorre progressivamente.
+- Engine async incompativel com `TestClient` sincrono do FastAPI — mitiga usando
+  `dependency_overrides` para mockar `get_db` nos testes de contrato.
+
+Migracao:
+
+- Instalar PostgreSQL e criar banco de dados.
+- Adicionar `DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/vidacomdeus` ao `.env`.
+- Executar `uv sync` para instalar novas dependencias (`sqlalchemy`, `psycopg`, `alembic`, `passlib`).
+- Aplicar migracoes: `uv run alembic upgrade head` a partir de `back-end/`.
+
+Testes:
+
+- `pytest tests/contract/test_endpoints.py` — 50+ testes devem passar sem banco configurado.
+- `uv run alembic upgrade head` sem erros confirma migracoes validas.
+- Com banco configurado: `POST /v1/auth/signup` cria usuario com senha hasheada em Argon2.
+
+Referencias:
+
+- `back-end/docs/decisoes-fase2.md` — 6 decisoes arquiteturais documentadas.
+- `back-end/migrations/versions/` — 3 migracoes Alembic.
+- `back-end/app/models/` — modelos SQLAlchemy 2.0.
+- `back-end/app/repositories/` — repositorios por dominio.
+- `back-end/app/services/` — servicos de negocio.
+- Commit: `59da88d` — feat: migra back-end para PostgreSQL com SQLAlchemy 2.0, Alembic,
+  repositorios, servicos e 50 testes de contrato passando.

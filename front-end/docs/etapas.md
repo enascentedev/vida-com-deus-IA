@@ -425,3 +425,95 @@ mensagens). A rota `/admin` permanece intacta com o monitor de infraestrutura.
 
 - `config.py`: adicionado `extra="ignore"` no `SettingsConfigDict` para aceitar variaveis
   extras no `.env` sem erros de validacao.
+
+---
+
+## Etapa 13 — Migracao para PostgreSQL com SQLAlchemy 2.0 e Alembic (2026-02-21)
+
+**Objetivo:** Implementar a camada de persistencia real com PostgreSQL (Fase 2), substituindo
+os arquivos JSON locais por modelos SQLAlchemy 2.0 async, repositorios por dominio, servicos
+de negocio e migracoes versionadas com Alembic. Testes de contrato atualizados para 50+
+casos com mocks de dependencia de banco.
+
+### Infraestrutura de banco (`app/core/database.py`)
+
+- Engine async criada via `create_async_engine` apontando para `DATABASE_URL` do `.env`.
+- Session factory `async_sessionmaker` com `expire_on_commit=False`.
+- Dependencia `get_db` injetavel via `Depends` em qualquer endpoint.
+
+### Modelos SQLAlchemy (`app/models/`)
+
+- `base.py` — `BaseModel` com `id: UUID`, `created_at` e `updated_at` gerados automaticamente.
+- `user.py` — `User`, `RefreshToken`, `PasswordResetToken`, `UserSettings`.
+- `post.py` — `Post`, `PostTag`.
+- `library.py` — `Favorite`, `ReadingHistory`.
+- `chat.py` — `Conversation`, `Message`.
+
+### Repositorios (`app/repositories/`)
+
+Repositorios assincronos por dominio encapsulando queries SQLAlchemy:
+
+- `user_repository.py` — CRUD de usuarios, busca por email, gerenciamento de refresh tokens.
+- `post_repository.py` — feed paginado, busca por ID, tags.
+- `library_repository.py` — favoritos e historico por usuario.
+- `chat_repository.py` — conversas e mensagens por usuario.
+
+### Servicos de negocio (`app/services/`)
+
+Logica de negocio isolada dos endpoints e dos repositorios:
+
+- `auth_service.py` — signup com hash Argon2, login com verificacao de senha, emissao de tokens.
+- `user_service.py` — perfil, settings, atualizacao de dados.
+- `post_service.py` — listagem de feed, detalhe de post.
+- `library_service.py` — adicionar/remover favoritos, historico.
+- `chat_service.py` — criacao de conversa, envio de mensagem com GPT-4o-mini.
+
+### Migracoes Alembic (`migrations/versions/`)
+
+Tres migracoes versionadas e encadeadas:
+
+1. `df122fb2dd78` — Cria tabelas de usuarios e autenticacao (`users`, `refresh_tokens`,
+   `password_reset_tokens`, `user_settings`).
+2. `d98403ced0d7` — Cria tabelas de posts e tags (`posts`, `post_tags`).
+3. `dc263afe3007` — Cria tabelas de biblioteca, chat e historico (`favorites`,
+   `reading_history`, `conversations`, `messages`).
+
+### Hash de senhas — Argon2
+
+- `passlib[argon2]` adicionado ao `pyproject.toml`.
+- `security.py` atualizado com `CryptContext(schemes=["argon2"])` para hash e verificacao.
+- Argon2 escolhido por ser o estado da arte em hashing de senhas (vencedor da
+  Password Hashing Competition 2015), configuravel em CPU, memoria e paralelismo.
+
+### Testes de contrato atualizados
+
+- `tests/contract/test_endpoints.py` refatorado para usar `dependency_overrides`:
+  - `get_current_user_id` substituido por lambda retornando UUID fixo.
+  - `get_db` substituido por `AsyncMock` — sem banco real necessario nos testes de contrato.
+- Total de testes: 50+ casos cobrindo todos os dominios (incluindo therapist).
+
+### Decisoes arquiteturais documentadas
+
+- `back-end/docs/decisoes-fase2.md` criado com 6 decisoes registradas:
+  - SQLAlchemy 2.0 async (descartando SQLModel).
+  - Redis adiado para Fase 3.
+  - Argon2 para hash de senhas.
+  - testcontainers para testes de integracao (Fase 3).
+  - Todos os dominios implementados na mesma branch.
+  - Base de dados zerada (sem migracao de dados JSON).
+
+### Dependencias adicionadas ao `pyproject.toml`
+
+- `sqlalchemy>=2.0` com extras `asyncio`.
+- `psycopg[binary]>=3.1` — driver async nativo para PostgreSQL.
+- `alembic>=1.13` — migracoes de schema.
+- `passlib[argon2]>=1.7` — hash de senhas.
+
+### Variavel de ambiente adicionada ao `.env.example`
+
+- `DATABASE_URL=postgresql+psycopg://user:password@localhost:5432/vidacomdeus`.
+
+### Commits desta etapa
+
+- `59da88d` — feat: migra back-end para PostgreSQL com SQLAlchemy 2.0, Alembic,
+  repositorios, servicos e 50 testes de contrato passando.

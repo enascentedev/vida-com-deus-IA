@@ -74,6 +74,71 @@
         ],
         "homework": "Tarefa de teste",
         "next_session_date": null
+      },
+      {
+        "id": "sess-3d982d99",
+        "patient_id": "pat-001",
+        "created_at": "2026-02-21T18:42:49.097387Z",
+        "date": "2025-12-01",
+        "summary": "Sessão de teste",
+        "mood": "great",
+        "topics_covered": [
+          "teste"
+        ],
+        "homework": "Tarefa de teste",
+        "next_session_date": null
+      },
+      {
+        "id": "sess-705a3b53",
+        "patient_id": "pat-001",
+        "created_at": "2026-02-21T18:44:58.012700Z",
+        "date": "2025-12-01",
+        "summary": "Sessão de teste",
+        "mood": "great",
+        "topics_covered": [
+          "teste"
+        ],
+        "homework": "Tarefa de teste",
+        "next_session_date": null
+      },
+      {
+        "id": "sess-52f624e0",
+        "patient_id": "pat-001",
+        "created_at": "2026-02-21T18:55:18.715605Z",
+        "date": "2025-12-01",
+        "summary": "Sessão de teste",
+        "mood": "great",
+        "topics_covered": [
+          "teste"
+        ],
+        "homework": "Tarefa de teste",
+        "next_session_date": null
+      },
+      {
+        "id": "sess-09aedc69",
+        "patient_id": "pat-001",
+        "created_at": "2026-02-21T22:24:30.799180Z",
+        "date": "2025-12-01",
+        "summary": "Sessão de teste",
+        "mood": "great",
+        "topics_covered": [
+          "teste"
+        ],
+        "homework": "Tarefa de teste",
+        "next_session_date": null
+      },
+      {
+        "id": "sess-a4558603",
+        "patient_id": "pat-001",
+        "created_at": "2026-02-21T22:30:05.935614Z",
+        "date": "2025-12-01",
+        "summary": "Sessão de teste",
+        "mood": "great",
+        "topics_covered": [
+          "teste"
+        ],
+        "homework": "Tarefa de teste",
+        "next_session_date": null
       }
     ]
   },
@@ -296,6 +361,276 @@
         "homework": null,
         "next_session_date": null,
         "created_at": "2026-02-21T04:53:42.352989Z"
+      }
+    ]
+  },
+  {
+    "id": "pat-1df466ed",
+    "name": "Teste Criação",
+    "email": "teste@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T18:42:48.604851Z",
+    "chief_complaint": "Queixa de teste",
+    "anxiety_level": "mild",
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 50,
+    "sessions": []
+  },
+  {
+    "id": "pat-6f868bf2",
+    "name": "Com Sessão",
+    "email": "sessao@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T18:42:48.655860Z",
+    "chief_complaint": null,
+    "anxiety_level": null,
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 100,
+    "sessions": [
+      {
+        "id": "sess-b0a2acca",
+        "patient_id": "pat-6f868bf2",
+        "date": "2025-12-01",
+        "summary": "Sessão inicial",
+        "mood": "good",
+        "topics_covered": [],
+        "homework": null,
+        "next_session_date": null,
+        "created_at": "2026-02-21T18:42:48.655860Z"
+      }
+    ]
+  },
+  {
+    "id": "pat-18bcdfb0",
+    "name": "Teste Criação",
+    "email": "teste@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T18:44:57.550716Z",
+    "chief_complaint": "Queixa de teste",
+    "anxiety_level": "mild",
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 50,
+    "sessions": []
+  },
+  {
+    "id": "pat-09ae471f",
+    "name": "Com Sessão",
+    "email": "sessao@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T18:44:57.591224Z",
+    "chief_complaint": null,
+    "anxiety_level": null,
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 100,
+    "sessions": [
+      {
+        "id": "sess-5f22fc54",
+        "patient_id": "pat-09ae471f",
+        "date": "2025-12-01",
+        "summary": "Sessão inicial",
+        "mood": "good",
+        "topics_covered": [],
+        "homework": null,
+        "next_session_date": null,
+        "created_at": "2026-02-21T18:44:57.591224Z"
+      }
+    ]
+  },
+  {
+    "id": "pat-13b8eab2",
+    "name": "Teste Criação",
+    "email": "teste@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T18:55:18.393262Z",
+    "chief_complaint": "Queixa de teste",
+    "anxiety_level": "mild",
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 50,
+    "sessions": []
+  },
+  {
+    "id": "pat-a8b13d3f",
+    "name": "Com Sessão",
+    "email": "sessao@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T18:55:18.431284Z",
+    "chief_complaint": null,
+    "anxiety_level": null,
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 100,
+    "sessions": [
+      {
+        "id": "sess-bf15b3e7",
+        "patient_id": "pat-a8b13d3f",
+        "date": "2025-12-01",
+        "summary": "Sessão inicial",
+        "mood": "good",
+        "topics_covered": [],
+        "homework": null,
+        "next_session_date": null,
+        "created_at": "2026-02-21T18:55:18.431284Z"
+      }
+    ]
+  },
+  {
+    "id": "pat-8ba2334d",
+    "name": "Teste Criação",
+    "email": "teste@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T22:24:30.436667Z",
+    "chief_complaint": "Queixa de teste",
+    "anxiety_level": "mild",
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 50,
+    "sessions": []
+  },
+  {
+    "id": "pat-ac623cb9",
+    "name": "Com Sessão",
+    "email": "sessao@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T22:24:30.479102Z",
+    "chief_complaint": null,
+    "anxiety_level": null,
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 100,
+    "sessions": [
+      {
+        "id": "sess-ef70961e",
+        "patient_id": "pat-ac623cb9",
+        "date": "2025-12-01",
+        "summary": "Sessão inicial",
+        "mood": "good",
+        "topics_covered": [],
+        "homework": null,
+        "next_session_date": null,
+        "created_at": "2026-02-21T22:24:30.479102Z"
+      }
+    ]
+  },
+  {
+    "id": "pat-b2afae0a",
+    "name": "Teste Criação",
+    "email": "teste@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T22:30:05.449533Z",
+    "chief_complaint": "Queixa de teste",
+    "anxiety_level": "mild",
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 50,
+    "sessions": []
+  },
+  {
+    "id": "pat-b48822d4",
+    "name": "Com Sessão",
+    "email": "sessao@email.com",
+    "status": "active",
+    "created_at": "2026-02-21T22:30:05.496061Z",
+    "chief_complaint": null,
+    "anxiety_level": null,
+    "depression_level": null,
+    "sleep_quality": null,
+    "suicidal_ideation": false,
+    "current_medication": null,
+    "therapy_goal": null,
+    "therapeutic_approach": null,
+    "focus_topics": [],
+    "avoid_topics": [],
+    "response_depth": "moderate",
+    "messages_used": 0,
+    "messages_limit": 100,
+    "sessions": [
+      {
+        "id": "sess-bc5e2453",
+        "patient_id": "pat-b48822d4",
+        "date": "2025-12-01",
+        "summary": "Sessão inicial",
+        "mood": "good",
+        "topics_covered": [],
+        "homework": null,
+        "next_session_date": null,
+        "created_at": "2026-02-21T22:30:05.496061Z"
       }
     ]
   }

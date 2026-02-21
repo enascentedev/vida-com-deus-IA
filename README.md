@@ -33,6 +33,7 @@ O projeto nasceu como um frontend Vue.js e passou por uma reescrita completa —
 - 💬 **Chat Bíblico com IA** — Mensagens com citações expansíveis e sugestões de perguntas
 - 📚 **Biblioteca** — Favoritos e histórico com busca e filtros
 - ⚙️ **Configurações** — Perfil do usuário, seletor de tema, toggles de IA e notificações
+- 🩺 **Dashboard do Terapeuta** — Gestão de pacientes, intake clínico, timeline de sessões, diretrizes de IA e controle de cota de mensagens
 - 🖥️ **Admin Monitor** — Painel de monitoramento com métricas, ETL e alertas
 
 ---
@@ -45,10 +46,12 @@ vida-com-deus-IA/
 ├── front-end/                        # Aplicação React 19 + Vite + Tailwind v4
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── auth/                 # LoginForm
-│   │   │   └── layout/               # BottomNavigation, SecondaryTopbar
-│   │   ├── pages/                    # 10 páginas implementadas
-│   │   └── lib/utils.ts              # cn() (clsx + tailwind-merge)
+│   │   │   ├── auth/                 # LoginForm, ProtectedRoute
+│   │   │   ├── layout/               # BottomNavigation, SecondaryTopbar
+│   │   │   └── therapist/            # OverviewView, PatientListView, PatientDetail, PatientIntakeForm, SessionForm, SessionCard
+│   │   ├── pages/                    # 11 páginas implementadas
+│   │   ├── store/                    # useAuthStore (Zustand)
+│   │   └── lib/                      # api.ts (cliente HTTP), utils.ts (cn())
 │   ├── vida-com-deus-ui/             # Biblioteca local de componentes (tsup)
 │   │   └── src/components/ui/        # Button, Card, Input, Badge, Skeleton, Separator
 │   ├── .claude/
@@ -69,18 +72,17 @@ vida-com-deus-IA/
     │   ├── main.py                   # FastAPI app — CORS, routers, health check
     │   ├── api/
     │   │   ├── router.py             # Agrega todos os routers sob /v1
-    │   │   └── v1/                   # auth, users, posts, library, chat, admin
-    │   ├── core/                     # config.py · security.py (JWT) · dependencies.py
+    │   │   └── v1/                   # auth, users, posts, library, chat, admin, therapist
+    │   ├── core/                     # config.py · security.py (JWT) · dependencies.py · storage.py · scraper.py · database.py
     │   ├── domain/                   # Schemas Pydantic por domínio
-    │   ├── services/                 # Lógica de negócio (Fase 2)
-    │   ├── repositories/             # Acesso a dados — PostgreSQL (Fase 2)
-    │   ├── workers/                  # Tarefas assíncronas — e-mail, ETL (Fase 2)
-    │   └── integrations/             # Provedores externos — IA, storage (Fase 2)
+    │   ├── models/                   # Modelos SQLAlchemy 2.0 (User, Post, Favorite, Conversation, etc.)
+    │   ├── repositories/             # Repositórios de acesso a dados (user, post, library, chat)
+    │   └── services/                 # Lógica de negócio (auth, user, post, library, chat)
+    ├── migrations/                   # Migrações Alembic
+    │   └── versions/                 # 3 migrações: users/auth, posts/tags, library/chat
+    ├── data/                         # Persistência JSON local (Fase 1.5 — fallback)
     └── tests/
-        ├── contract/                 # 40+ testes de contrato (Fase 1)
-        ├── unit/                     # (Fase 2)
-        ├── integration/              # (Fase 2)
-        └── e2e/                      # (Fase 2)
+        └── contract/                 # 50+ testes de contrato
 ```
 
 ---
@@ -98,7 +100,10 @@ vida-com-deus-IA/
 | Biblioteca UI local | vida-com-deus-ui (tsup — ESM + CJS + .d.ts) |
 | Framework Backend | FastAPI 0.115 + Python 3.13 |
 | Validação | Pydantic v2 |
-| Autenticação | JWT (python-jose) |
+| Autenticação | JWT (python-jose) + Argon2 (passlib) |
+| ORM | SQLAlchemy 2.0 async + psycopg3 |
+| Migrações | Alembic |
+| Banco de Dados | PostgreSQL |
 | Gerenciador Python | uv |
 | Testes Backend | pytest + pytest-asyncio |
 
@@ -106,7 +111,7 @@ vida-com-deus-IA/
 
 ## 🔌 Arquitetura Backend
 
-O backend é uma API FastAPI modular orientada a domínios, atualmente em **Fase 1** (dados mockados). PostgreSQL e Redis estão planejados para a Fase 2.
+O backend é uma API FastAPI modular orientada a domínios. A **Fase 1.5** entregou persistência em arquivos JSON locais, ETL real e integração com GPT-4o-mini. A **Fase 2** adicionou modelos SQLAlchemy 2.0, repositórios, serviços e 3 migrações Alembic para PostgreSQL.
 
 **Endpoints disponíveis em `/v1`:**
 
@@ -117,6 +122,7 @@ O backend é uma API FastAPI modular orientada a domínios, atualmente em **Fase
 | Posts | `/posts/feed`, `/posts/{id}`, `/posts/{id}/audio` |
 | Biblioteca | `/library/`, `/library/favorites/{id}` |
 | Chat | `/chat/conversations`, `/chat/conversations/{id}/messages` |
+| Therapist | `/therapist/overview`, `/therapist/patients`, `/therapist/patients/{id}`, e sub-rotas de status, limite e sessões |
 | Admin | `/admin/metrics/storage`, `/admin/alerts`, `/admin/etl/runs/execute` |
 | Health | `GET /health` (fora do prefixo `/v1`) |
 
@@ -129,6 +135,7 @@ O backend é uma API FastAPI modular orientada a domínios, atualmente em **Fase
 - Node.js 20+
 - Python 3.13
 - [uv](https://docs.astral.sh/uv/) — `pip install uv`
+- PostgreSQL 15+ (para a Fase 2 — banco de dados real)
 
 ### Frontend
 
@@ -154,6 +161,10 @@ uv sync
 # Configurar variáveis de ambiente
 cp .env.example .env
 # Gere o JWT_SECRET_KEY: python -c "import secrets; print(secrets.token_hex(32))"
+# Configure DATABASE_URL no .env para PostgreSQL (Fase 2)
+
+# Aplicar migrações do banco de dados (requer PostgreSQL configurado)
+uv run alembic upgrade head
 
 # Iniciar servidor (uv run ativa o .venv automaticamente)
 uv run uvicorn app.main:app --reload

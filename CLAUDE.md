@@ -98,31 +98,36 @@ Ao alterar componentes em `vida-com-deus-ui`, rebuilde a biblioteca antes de tes
 ```bash
 # Executar a partir de back-end/
 uv sync                                    # Instalar dependências (cria .venv)
+uv run alembic upgrade head                # Aplicar migrações (requer PostgreSQL configurado)
 uv run uvicorn app.main:app --reload       # Servidor de desenvolvimento (localhost:8000)
-pytest                                     # Todos os testes
+pytest                                     # Todos os testes (50+)
 pytest tests/contract                      # Testes de contrato
 pytest --cov                               # Com cobertura
 ```
 
-Copiar `.env.example` para `.env` e configurar as variáveis antes de rodar. `uv run` ativa o `.venv` automaticamente — não é necessário ativar manualmente.
+Copiar `.env.example` para `.env` e configurar as variáveis antes de rodar. `uv run` ativa o `.venv` automaticamente — não é necessário ativar manualmente. `DATABASE_URL` é obrigatória para os endpoints que usam banco real.
 
 Documentação interativa disponível em `http://localhost:8000/docs` (Swagger UI).
 
 ### Camadas
 
-**Estado atual (Fase 1.5):** Endpoints principais persistem dados em arquivos JSON locais (`data/`).
+**Estado atual (Fase 2):** Modelos SQLAlchemy 2.0 async, repositórios e serviços implementados.
+Migrações Alembic para PostgreSQL com 3 versões cobrindo todos os domínios.
 Chat bíblico integrado ao GPT-4o-mini (fallback mock quando `OPENAI_API_KEY` ausente).
-Banco de dados (PostgreSQL) e Redis planejados para Fase 2.
+Arquivos JSON locais (`data/`) mantidos como fallback de leitura durante transição.
+Redis planejado para Fase 3.
 
 ```text
 app/
 ├── api/v1/          # Routers FastAPI (auth, users, posts, library, chat, admin, therapist)
-├── core/            # config.py (Pydantic Settings), security.py (JWT), dependencies.py,
-│                    # storage.py (leitura/escrita JSON), scraper.py (ETL wgospel.com)
-├── domain/          # Schemas Pydantic por domínio (sem lógica de negócio)
-├── services/        # Lógica de negócio (planejado — Fase 2)
-└── repositories/    # Acesso a dados (planejado — Fase 2)
-data/                # Persistência JSON local (Fase 1.5)
+├── core/            # config.py (Pydantic Settings), security.py (JWT + Argon2),
+│                    # dependencies.py, storage.py (JSON), scraper.py (ETL), database.py (SQLAlchemy)
+├── domain/          # Schemas Pydantic por domínio (request/response da API)
+├── models/          # Modelos SQLAlchemy 2.0 (User, Post, Favorite, Conversation, etc.)
+├── repositories/    # Acesso a dados async (user, post, library, chat)
+└── services/        # Lógica de negócio (auth, user, post, library, chat)
+migrations/          # Alembic — 3 migrações versionadas
+data/                # Persistência JSON local (fallback Fase 1.5)
 ├── posts.json       # Posts coletados pelo ETL
 ├── patients.json    # Pacientes do dashboard do psicólogo
 ├── favorites.json   # Favoritos da biblioteca por usuário
@@ -154,6 +159,7 @@ data/                # Persistência JSON local (Fase 1.5)
 ## Documentação do Projeto
 
 - `back-end/arquitetura-back-end.md` — decisões arquiteturais, contratos de API, estratégia de testes
+- `back-end/docs/decisoes-fase2.md` — decisões arquiteturais da Fase 2 (PostgreSQL, Argon2, Alembic)
 - `front-end/docs/etapas.md` — histórico de trabalho concluído
 - `front-end/docs/registro-features.md` — template obrigatório para registrar novas features
 
