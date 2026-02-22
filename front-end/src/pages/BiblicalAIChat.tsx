@@ -153,14 +153,26 @@ export function BiblicalAIChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [conversationId, setConversationId] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   // Avatar do usuário autenticado
   const avatarUrl = useAuthStore((s) => s.user?.avatar_url) ?? AVATAR_URL
 
-  // Carrega histórico ao montar o componente
+  // Obtém ou cria conversa ao montar o componente
   useEffect(() => {
-    chatApi.getMessages()
+    chatApi.listConversations()
+      .then(async (data) => {
+        let convId: string
+        if (data.conversations.length > 0) {
+          convId = data.conversations[0].id
+        } else {
+          const newConv = await chatApi.createConversation()
+          convId = newConv.id
+        }
+        setConversationId(convId)
+        return chatApi.getMessages(convId)
+      })
       .then((data) => {
         const loaded: Message[] = data.messages.map((m, i) => ({
           id: i + 1,
@@ -182,7 +194,7 @@ export function BiblicalAIChat() {
 
   async function handleSend() {
     const text = input.trim()
-    if (!text || isLoading) return
+    if (!text || isLoading || !conversationId) return
 
     setInput("")
 
@@ -197,7 +209,7 @@ export function BiblicalAIChat() {
     setIsLoading(true)
 
     try {
-      const data = await chatApi.sendMessage(text)
+      const data = await chatApi.sendMessage(conversationId!, text)
       const aiMsg: Message = {
         id: baseId + 2,
         type: "ai",

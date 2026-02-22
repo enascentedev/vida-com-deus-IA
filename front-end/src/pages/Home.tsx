@@ -1,14 +1,16 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Bell,
   BookOpen,
   ChevronRight,
   MessageSquare,
-  Mic,
   Search,
   Play,
+  Pause,
   Star,
   Sparkles,
+  Loader2,
+  Volume2,
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { postsApi } from "@/lib/api"
@@ -21,12 +23,20 @@ import { BottomNavigation } from "@/components/layout/BottomNavigation"
 /*  Imagens placeholder (usadas como fallback)                                 */
 /* -------------------------------------------------------------------------- */
 const HERO_IMAGE = "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80"
-const AVATAR_URL = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80"
+// Silhueta genérica — mesmo padrão usado em /configuracoes
+const AVATAR_URL =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23e2e8f0'/%3E%3Ccircle cx='50' cy='38' r='18' fill='%2394a3b8'/%3E%3Cellipse cx='50' cy='90' rx='32' ry='24' fill='%2394a3b8'/%3E%3C/svg%3E"
 
 /* -------------------------------------------------------------------------- */
 /*  Topbar                                                                     */
 /* -------------------------------------------------------------------------- */
-function Topbar() {
+function Topbar({
+  searchQuery,
+  onSearchChange,
+}: {
+  searchQuery: string
+  onSearchChange: (v: string) => void
+}) {
   const avatarUrl = useAuthStore((s) => s.user?.avatar_url) ?? AVATAR_URL
   const navigate = useNavigate()
   return (
@@ -64,12 +74,20 @@ function Topbar() {
           <Search size={18} className="text-slate-400 shrink-0" />
           <input
             type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Buscar reflexões ou versículos..."
             className="flex-1 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 outline-none"
           />
-          <button aria-label="Busca por voz" className="transition-transform duration-200 hover:scale-110 active:scale-95">
-            <Mic size={18} className="text-slate-400" />
-          </button>
+          {searchQuery && (
+            <button
+              onClick={() => onSearchChange("")}
+              aria-label="Limpar busca"
+              className="text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              ×
+            </button>
+          )}
         </div>
       </div>
     </header>
@@ -79,8 +97,71 @@ function Topbar() {
 /* -------------------------------------------------------------------------- */
 /*  Hero Card (Post do Dia)                                                    */
 /* -------------------------------------------------------------------------- */
+type AudioState = "idle" | "loading" | "playing" | "paused" | "unavailable"
+
 function HeroCard({ post }: { post: PostSummary | null }) {
   const navigate = useNavigate()
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [audioState, setAudioState] = useState<AudioState>("idle")
+
+  async function handlePlayAudio() {
+    if (!post) return
+
+    // Se já está tocando, pausa
+    if (audioState === "playing" && audioRef.current) {
+      audioRef.current.pause()
+      setAudioState("paused")
+      return
+    }
+
+    // Se está pausado, retoma
+    if (audioState === "paused" && audioRef.current) {
+      audioRef.current.play()
+      setAudioState("playing")
+      return
+    }
+
+    // Busca o post completo para obter audio_url
+    setAudioState("loading")
+    try {
+      const detail = await postsApi.getPost(post.id)
+      if (!detail.audio_url) {
+        setAudioState("unavailable")
+        setTimeout(() => setAudioState("idle"), 3000)
+        return
+      }
+      const audio = new Audio(detail.audio_url)
+      audioRef.current = audio
+      audio.onended = () => setAudioState("idle")
+      audio.onerror = () => { setAudioState("unavailable"); setTimeout(() => setAudioState("idle"), 3000) }
+      await audio.play()
+      setAudioState("playing")
+    } catch {
+      setAudioState("unavailable")
+      setTimeout(() => setAudioState("idle"), 3000)
+    }
+  }
+
+  // Para o áudio ao desmontar
+  useEffect(() => {
+    return () => { audioRef.current?.pause() }
+  }, [])
+
+  const audioIcon = audioState === "loading"
+    ? <Loader2 size={14} className="text-white animate-spin" />
+    : audioState === "playing"
+    ? <Pause size={14} className="text-white fill-white" />
+    : audioState === "unavailable"
+    ? <Volume2 size={14} className="text-white opacity-50" />
+    : <Play size={14} className="text-white fill-white" />
+
+  const audioLabel =
+    audioState === "loading" ? "Carregando áudio..." :
+    audioState === "playing" ? "Pausar áudio" :
+    audioState === "paused" ? "Retomar áudio" :
+    audioState === "unavailable" ? "Áudio indisponível" :
+    "Ouvir áudio"
+
   return (
     <div className="px-4 py-4 animate-slide-up">
       <div className="relative overflow-hidden rounded-2xl shadow-[0_8px_40px_-8px_rgb(15_23_42/0.30)] bg-slate-900 text-white transition-shadow duration-300 hover:shadow-[0_16px_48px_-8px_rgb(15_23_42/0.40)]">
@@ -91,7 +172,7 @@ function HeroCard({ post }: { post: PostSummary | null }) {
           </Badge>
         </div>
         {/* Imagem */}
-        <div className="w-full aspect-[16/9] relative overflow-hidden">
+        <div className="w-full aspect-video relative overflow-hidden">
           {post === null ? (
             <Skeleton className="w-full h-full" />
           ) : (
@@ -139,14 +220,18 @@ function HeroCard({ post }: { post: PostSummary | null }) {
         <div className="flex items-center gap-3">
           <Sparkles size={20} className="text-blue-600 shrink-0" />
           <p className="text-xs font-medium text-blue-700">
-            Quer um resumo em áudio desta reflexão?
+            {audioState === "unavailable"
+              ? "Áudio ainda não disponível para esta reflexão."
+              : "Quer um resumo em áudio desta reflexão?"}
           </p>
         </div>
         <button
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 transition-all duration-200 hover:shadow-lg hover:shadow-blue-600/30 active:scale-95"
-          aria-label="Ouvir áudio"
+          onClick={handlePlayAudio}
+          disabled={audioState === "loading" || audioState === "unavailable" || post === null}
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 transition-all duration-200 hover:shadow-lg hover:shadow-blue-600/30 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+          aria-label={audioLabel}
         >
-          <Play size={14} className="text-white fill-white" />
+          {audioIcon}
         </button>
       </div>
     </div>
@@ -161,40 +246,65 @@ function RecentPost({ post }: { post: PostSummary }) {
   return (
     <button
       onClick={() => navigate(`/post/${post.id}`)}
-      className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm w-full text-left transition-all duration-200 hover:shadow-[0_4px_20px_-4px_rgb(37_99_235/0.12)] hover:-translate-y-0.5 active:scale-[0.99]"
+      className="flex rounded-2xl border border-slate-100 bg-white shadow-sm w-full text-left overflow-hidden transition-all duration-200 hover:shadow-[0_6px_24px_-4px_rgb(37_99_235/0.15)] hover:-translate-y-0.5 active:scale-[0.99]"
     >
-      <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl">
+      {/* Imagem — preenche toda a altura do card, sem padding */}
+      <div className="relative shrink-0 w-36 self-stretch min-h-[130px]">
         <img
           src={post.thumbnail_url ?? HERO_IMAGE}
           alt={post.title}
-          className="h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover"
         />
+        {/* Gradiente sutil para separar da borda */}
+        <div className="absolute inset-y-0 right-0 w-4 bg-linear-to-r from-transparent to-black/10" />
         {post.is_new && (
-          <span className="absolute -top-1 -right-1 flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-600 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-600" />
+          <span className="absolute top-2 left-2 flex h-2.5 w-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600" />
           </span>
         )}
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2 mb-0.5">
-          {post.is_new && (
-            <Badge
-              variant="secondary"
-              className="h-4 border-none bg-blue-50 px-1.5 text-[10px] text-blue-600 font-bold uppercase"
-            >
-              Novo
-            </Badge>
+
+      {/* Conteúdo */}
+      <div className="flex flex-col justify-between flex-1 min-w-0 p-4">
+        <div className="space-y-1.5">
+          {/* Badges */}
+          {(post.is_new || post.is_starred) && (
+            <div className="flex items-center gap-1.5">
+              {post.is_new && (
+                <Badge
+                  variant="secondary"
+                  className="h-4 border-none bg-blue-50 px-1.5 text-[10px] text-blue-600 font-bold uppercase"
+                >
+                  Novo
+                </Badge>
+              )}
+              {post.is_starred && <Star size={11} className="fill-amber-400 text-amber-400" />}
+            </div>
           )}
-          {post.is_starred && <Star size={12} className="fill-amber-400 text-amber-400" />}
-          <span className="text-xs text-slate-400">{post.date}</span>
+          {/* Data */}
+          <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">
+            {post.date}
+          </p>
+          {/* Título */}
+          <h3 className="font-bold text-slate-800 leading-snug line-clamp-2 text-[15px]">
+            {post.title}
+          </h3>
+          {/* Referência e categoria */}
+          <p className="text-xs text-slate-400">
+            <span className="text-blue-600 font-medium">{post.reference}</span>
+            {" · "}
+            {post.category}
+          </p>
         </div>
-        <h3 className="truncate font-bold text-slate-800">{post.title}</h3>
-        <p className="text-xs text-slate-500">
-          {post.reference} • {post.category}
-        </p>
+
+        {/* Rodapé do card */}
+        <div className="flex items-center justify-end pt-3">
+          <span className="text-[11px] font-semibold text-blue-600 flex items-center gap-0.5">
+            Ler <ChevronRight size={13} className="mt-px" />
+          </span>
+        </div>
       </div>
-      <ChevronRight size={20} className="flex-shrink-0 text-slate-300" />
     </button>
   )
 }
@@ -204,11 +314,11 @@ function RecentPost({ post }: { post: PostSummary }) {
 /* -------------------------------------------------------------------------- */
 function PostSkeleton() {
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-dashed border-slate-200 p-3 opacity-60">
-      <Skeleton className="h-16 w-16 flex-shrink-0 rounded-xl" />
-      <div className="flex-1 space-y-2">
-        <Skeleton className="h-3 w-20" />
-        <Skeleton className="h-4 w-3/4" />
+    <div className="flex rounded-2xl border border-dashed border-slate-200 bg-white overflow-hidden opacity-60">
+      <Skeleton className="shrink-0 w-36 min-h-[130px] rounded-none" />
+      <div className="flex-1 p-4 space-y-2.5">
+        <Skeleton className="h-2.5 w-16" />
+        <Skeleton className="h-4 w-4/5" />
         <Skeleton className="h-3 w-1/2" />
       </div>
     </div>
@@ -218,21 +328,62 @@ function PostSkeleton() {
 /* -------------------------------------------------------------------------- */
 /*  Seção de Posts Recentes                                                    */
 /* -------------------------------------------------------------------------- */
-function RecentPostsSection({ posts, isLoading }: { posts: PostSummary[]; isLoading: boolean }) {
+const INITIAL_VISIBLE = 3
+
+function RecentPostsSection({
+  posts,
+  isLoading,
+  searchQuery,
+}: {
+  posts: PostSummary[]
+  isLoading: boolean
+  searchQuery: string
+}) {
+  const [showAll, setShowAll] = useState(false)
+
+  const filtered = searchQuery.trim()
+    ? posts.filter((p) => {
+        const q = searchQuery.toLowerCase()
+        return (
+          p.title.toLowerCase().includes(q) ||
+          p.reference.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q) ||
+          p.tags.some((t) => t.toLowerCase().includes(q))
+        )
+      })
+    : posts
+
+  const visible = showAll ? filtered : filtered.slice(0, INITIAL_VISIBLE)
+  const hasMore = filtered.length > INITIAL_VISIBLE
+
   return (
     <div className="space-y-3 px-4 pb-4 animate-slide-up">
       <div className="flex items-center justify-between pt-1">
-        <h2 className="text-xl font-bold tracking-tight text-slate-800">Posts Recentes</h2>
-        <button className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors duration-200">Ver tudo</button>
+        <h2 className="text-xl font-bold tracking-tight text-slate-800">
+          {searchQuery.trim() ? `Resultados para "${searchQuery}"` : "Posts Recentes"}
+        </h2>
+        {!searchQuery.trim() && hasMore && (
+          <button
+            onClick={() => setShowAll((v) => !v)}
+            className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors duration-200"
+          >
+            {showAll ? "Ver menos" : "Ver tudo"}
+          </button>
+        )}
       </div>
       <div className="space-y-3">
         {isLoading ? (
           <>
             <PostSkeleton />
             <PostSkeleton />
+            <PostSkeleton />
           </>
+        ) : filtered.length === 0 ? (
+          <p className="text-sm text-slate-400 text-center py-6">
+            Nenhuma reflexão encontrada para "{searchQuery}".
+          </p>
         ) : (
-          posts.map((post) => <RecentPost key={post.id} post={post} />)
+          visible.map((post) => <RecentPost key={post.id} post={post} />)
         )}
       </div>
     </div>
@@ -272,6 +423,7 @@ export function Home() {
   const [feed, setFeed] = useState<FeedResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
 
   // Carrega o feed ao montar o componente
   useEffect(() => {
@@ -285,18 +437,19 @@ export function Home() {
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50">
-      <Topbar />
+      <Topbar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
       <main className="flex-1 pb-4 max-w-2xl mx-auto w-full">
-        <HeroCard post={feed?.post_of_day ?? null} />
+        {!searchQuery && <HeroCard post={feed?.post_of_day ?? null} />}
         {error && (
           <p className="text-sm text-red-500 text-center px-4 py-2">{error}</p>
         )}
         <RecentPostsSection
           posts={feed?.recent_posts ?? []}
           isLoading={isLoading}
+          searchQuery={searchQuery}
         />
-        <ChatCTA />
+        {!searchQuery && <ChatCTA />}
       </main>
 
       <div className="max-w-2xl mx-auto w-full">

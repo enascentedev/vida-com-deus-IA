@@ -517,3 +517,141 @@ Tres migracoes versionadas e encadeadas:
 
 - `59da88d` — feat: migra back-end para PostgreSQL com SQLAlchemy 2.0, Alembic,
   repositorios, servicos e 50 testes de contrato passando.
+
+---
+
+## Etapa 14 — Monitor de Banco Real, Player de Audio Interativo e Busca no Feed (2026-02-22)
+
+**Branch:** `feat/integracao-banco`
+
+**Objetivo:** Substituir dados mock no painel admin por metricas reais do PostgreSQL,
+implementar player de audio interativo (play/pause/seek/progresso) em PostDetail e Home,
+adicionar busca funcional no feed da Home e refatorar o chat para usar IDs de conversa
+dinamicos.
+
+### Back-end — Etapa 14
+
+**Nova migracao Alembic (`a1b2c3d4e5f6`):**
+
+- Criada tabela `storage_snapshots` com colunas `id`, `measured_at` (timestamptz, `NOW()`)
+  `used_bytes` e `total_bytes`.
+- Indice em `measured_at` para consultas de range por data.
+- Encadeia em `dc263afe3007` (quarta migracao; total agora: 4).
+
+**Endpoints de Admin atualizados (`app/api/v1/admin.py`):**
+
+- `GET /v1/admin/metrics/storage` — agora executa `SELECT pg_database_size(current_database())`
+  via SQLAlchemy async; grava snapshot diario idempotente em `storage_snapshots`; retorna
+  bytes, GB, percentual calculados a partir do limite configurado em `render_db_size_bytes`.
+  Mock `MOCK_STORAGE` removido.
+- `GET /v1/admin/metrics/growth` — calcula crescimento dos ultimos 7 dias a partir de
+  `storage_snapshots` (DISTINCT ON por data); retorna historico com nomes de dias em pt-BR
+  e percentual de variacao. Mock `MOCK_GROWTH` removido.
+- `GET /v1/admin/metrics/tables` — **novo endpoint** que consulta `pg_stat_user_tables`
+  retornando tamanho total, de dados e de indices de cada tabela (top 15 por tamanho).
+- `GET /v1/admin/alerts` — agora gera alertas dinamicamente com base no uso real:
+  limiares info (<70%), warning (>=70%), critical (>=85%). Alerta de falha ETL baseado
+  no ultimo registro de `etl_runs.json`. Mock `MOCK_ALERTS` removido.
+
+**Novos schemas Pydantic (`app/domain/admin/schemas.py`):**
+
+- `TableStat` — `table_name`, `total_bytes`, `data_bytes`, `index_bytes`, `total_mb`,
+  `rows_estimate`.
+- `TableBreakdownResponse` — `tables: list[TableStat]`, `measured_at`.
+
+**Configuracao (`app/core/config.py`):**
+
+- Novo campo `render_db_size_bytes: int` (padrao `1_073_741_824` — 1 GB / Render Free).
+- Constantes de plano documentadas nos comentarios: Free 1 GB, Starter 10 GB, Standard 35 GB.
+
+**Variavel de ambiente (`.env.example`):**
+
+- `RENDER_DB_SIZE_BYTES=1073741824` — configura o limite do plano Render para calculo de percentual.
+
+### Front-End — Etapa 14
+
+**Novos tipos e metodos em `src/lib/api.ts`:**
+
+- `TableStat`, `TableBreakdownResponse` — espelham schemas do admin.
+- `Conversation`, `ConversationListResponse` — suportam listagem de conversas.
+- `adminApi.getTableMetrics()` — `GET /admin/metrics/tables`.
+- `chatApi` refatorado: `listConversations()`, `createConversation()`, `getMessages(conversationId)`,
+  `sendMessage(conversationId, content)`. Antes: ID fixo `conv-001`; agora: ID dinamico.
+
+**Novas funcoes utilitarias em `src/lib/utils.ts`:**
+
+- `formatLocalDate(iso)` — formata data UTC para fuso local do browser em pt-BR ("DD/MM/AAAA").
+- `formatLocalDateTime(iso)` — formata data+hora UTC para fuso local ("DD/MM/AAAA, HH:MM").
+- `timeAgoLocal(iso)` — tempo relativo (minutos, horas) ou data/hora local quando >= 24h.
+  Substitui `timeAgo()` inline que estava em `AdminDatabaseMonitor.tsx`.
+
+**Novas animacoes CSS em `src/index.css`:**
+
+- `@keyframes bounce-in` — entrada com spring (overshoot + damping).
+- `@keyframes float` — flutuacao suave de 6px para cima e para baixo.
+- Variaveis CSS `--animate-bounce-in` e `--animate-float` adicionadas ao bloco `@theme`.
+
+**`AdminDatabaseMonitor.tsx` — redesenhado:**
+
+- Grafico SVG de crescimento agora e gerado dinamicamente a partir do historico real via
+  funcao `buildChartPaths()` (curva Bezier cubica suavizada). Antes: pontos estaticos hardcoded.
+- Novo card "Tabelas do Banco" exibindo tamanho e estimativa de linhas por tabela.
+- Tres limiares de cor para a barra de storage: `bg-blue-500` (normal), `bg-orange-500`
+  (>=70%), `bg-red-500` (>=85%). Badge "Alerta" / "Critico" correspondentes.
+- Subtitulo do card mostra o plano Render detectado automaticamente (`renderPlanLabel()`).
+- Helpers `fmtStorage()`, `renderPlanLabel()`, `fmtTableBytes()` extraidos para escopo do modulo.
+- `timeAgo()` inline substituido por `timeAgoLocal()` de `utils.ts`.
+
+**`Home.tsx` — busca e player de audio:**
+
+- Topbar recebe `searchQuery` e `onSearchChange` como props (antes: input decorativo sem estado).
+- Botao de microfone removido; substituido por botao de limpar busca (x) que aparece quando
+  ha texto digitado.
+- `RecentPostsSection` filtra posts localmente por titulo, referencia, categoria e tags.
+  Titulo da secao muda para `Resultados para "..."` durante busca.
+  Botao "Ver tudo"/"Ver menos" controla exibicao de mais de 3 posts (INITIAL_VISIBLE = 3).
+  Estado vazio exibe mensagem quando nenhum post bate com a busca.
+- `HeroCard` e `ChatCTA` ocultados durante busca ativa.
+- `HeroCard` ganhou player de audio interativo:
+  - `AudioState`: `"idle" | "loading" | "playing" | "paused" | "unavailable"`.
+  - Ao clicar em Play, busca `GET /v1/posts/:id` para obter `audio_url`; cria `Audio` nativo.
+  - Botao alterna entre Play, Pause e estados de loading/indisponivel com icones correspondentes.
+  - Audio parado ao desmontar o componente (`useEffect` cleanup).
+- Cards de posts recentes (`RecentPost`) redesenhados:
+  - Layout horizontal com imagem lateral de largura fixa (`w-36`, `min-h-[130px]`).
+  - Gradiente sutil na borda direita da imagem.
+  - Referencia biblica e categoria exibidas abaixo do titulo.
+  - Link "Ler" com ChevronRight no rodape do card.
+  - Badge "Novo" e estrela de destaque em linha separada.
+- `PostSkeleton` atualizado para espelhar o novo layout dos cards.
+- Avatar fallback trocado por SVG inline de silhueta generica (consistente com `/configuracoes`).
+
+**`PostDetail.tsx` — player de audio real:**
+
+- `AudioPlayer` completamente reimplementado:
+  - `useRef<HTMLAudioElement>` para controle do elemento de audio nativo.
+  - `AudioState`: `"idle" | "playing" | "paused" | "unavailable"`.
+  - Barra de progresso clicavel (`handleSeek`) — calcula proporcao por `clientX`.
+  - Exibe tempo atual e tempo restante em formato `M:SS`.
+  - Botao play/pause com icones `Play`/`Pause` do lucide-react.
+  - `audio.onloadedmetadata`, `audio.ontimeupdate`, `audio.onended`, `audio.onerror` para
+    sincronizar estado.
+  - Desabilitado quando `audio_url` e null (exibe opacidade reduzida).
+  - Cleanup no `useEffect` para parar o audio ao sair da pagina.
+- Layout do player redesenhado: imagem lateral de largura fixa (`w-32`) com gradiente,
+  botao play flutuante a direita do cabecalho.
+- Icone `Check` adicionado para feedback de acao concluida.
+
+**`BiblicalAIChat.tsx` — ID de conversa dinamico:**
+
+- Estado `conversationId: string | null` adicionado.
+- Na montagem: `chatApi.listConversations()` recupera conversas existentes; se nenhuma,
+  `chatApi.createConversation()` cria uma nova. ID salvo no estado.
+- `handleSend` bloqueado enquanto `conversationId` for `null`.
+- Chamadas `chatApi.getMessages(convId)` e `chatApi.sendMessage(conversationId!, text)` com
+  ID dinamico (antes: `conv-001` fixo).
+
+**`PatientDetail.tsx`:**
+
+- Data de inicio do paciente formatada via `formatLocalDateTime()` de `utils.ts` (antes:
+  `toLocaleDateString("pt-BR")` inline).

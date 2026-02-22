@@ -52,3 +52,17 @@ class SystemAlert(BaseModel):
 
 class AlertsResponse(BaseModel):
     alerts: list[SystemAlert]
+
+
+class TableStat(BaseModel):
+    table_name: str
+    total_bytes: int
+    data_bytes: int
+    index_bytes: int
+    total_mb: float
+    rows_estimate: int
+
+
+class TableBreakdownResponse(BaseModel):
+    tables: list[TableStat]
+    measured_at: str

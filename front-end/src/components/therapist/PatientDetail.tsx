@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom"
 import { ChevronLeft, Save, Plus, Pencil } from "lucide-react"
 import { therapistApi } from "@/lib/api"
 import type { PatientConfig, PatientStatus, TherapySession, AnxietyLevel, DepressionLevel, SleepQuality, ResponseDepth } from "@/lib/api"
+import { formatLocalDateTime } from "@/lib/utils"
 import { Badge, Skeleton, Button, Input } from "vida-com-deus-ui"
 import { SessionCard } from "./SessionCard"
 import { SessionForm } from "./SessionForm"
@@ -196,7 +197,7 @@ export function PatientDetail() {
             })}
             <Badge variant={badge.variant} className="ml-auto">{badge.label}</Badge>
           </div>
-          <p className="text-xs text-slate-400">Início: {new Date(patient.created_at).toLocaleDateString("pt-BR")}</p>
+          <p className="text-xs text-slate-400">Início: {formatLocalDateTime(patient.created_at)}</p>
         </SectionCard>
 
         {/* 2. Controle de Cota */}

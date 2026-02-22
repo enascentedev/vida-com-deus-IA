@@ -1189,3 +1189,206 @@ Referencias:
 - `back-end/app/services/` — servicos de negocio.
 - Commit: `59da88d` — feat: migra back-end para PostgreSQL com SQLAlchemy 2.0, Alembic,
   repositorios, servicos e 50 testes de contrato passando.
+
+---
+
+### [Data: 2026-02-22] — Monitor de Storage com Dados Reais do PostgreSQL
+
+Motivo da Criacao:
+
+- O painel admin exibia metricas de armazenamento totalmente mockadas (1.4 GB fixo).
+  Para monitorar o uso real do banco hospedado no Render, foi necessario conectar os
+  endpoints de admin ao PostgreSQL via `pg_database_size()` e criar uma tabela de
+  snapshots diarios para historico de crescimento.
+
+Escopo:
+
+- Back-end: `app/api/v1/admin.py`, `app/domain/admin/schemas.py`, `app/core/config.py`,
+  `back-end/.env.example`, nova migracao Alembic `a1b2c3d4e5f6`.
+- Front-end: `src/pages/AdminDatabaseMonitor.tsx`, `src/lib/api.ts`.
+
+Impacto:
+
+- `GET /v1/admin/metrics/storage` retorna bytes reais via `pg_database_size()` e grava
+  snapshot diario idempotente em `storage_snapshots`.
+- `GET /v1/admin/metrics/growth` calcula variacao percentual real dos ultimos 7 dias
+  a partir dos snapshots armazenados.
+- Novo endpoint `GET /v1/admin/metrics/tables` expoe tamanho e estimativa de linhas
+  por tabela via `pg_stat_user_tables`.
+- `GET /v1/admin/alerts` gera alertas dinamicos com tres limiares: info (<70%),
+  warning (>=70%), critical (>=85%).
+- Grafico SVG no front-end e agora gerado dinamicamente (curva Bezier).
+- Nova configuracao `RENDER_DB_SIZE_BYTES` permite ajustar o limite do plano Render.
+
+Riscos:
+
+- Endpoints de storage agora dependem de banco real: sem PostgreSQL configurado, os
+  endpoints retornam erro 500.
+- A tabela `storage_snapshots` e criada pela migracao `a1b2c3d4e5f6` — requer
+  `uv run alembic upgrade head` antes de usar os novos endpoints.
+- Snapshot diario e idempotente por dia (INSERT WHERE NOT EXISTS): se o servidor for
+  reiniciado multiplas vezes no mesmo dia, apenas o primeiro snapshot e gravado.
+
+Migracao:
+
+- Aplicar nova migracao: `uv run alembic upgrade head` a partir de `back-end/`.
+- Adicionar `RENDER_DB_SIZE_BYTES=1073741824` ao `.env` (ou ajustar conforme plano Render).
+
+Testes:
+
+- `pytest tests/contract/test_endpoints.py` — testes de contrato existentes devem passar
+  (admin mockado via `dependency_overrides`).
+- Com banco configurado: `GET /v1/admin/metrics/storage` retorna uso real; verificar que
+  `measured_at` esta registrado em `storage_snapshots`.
+- `GET /v1/admin/metrics/tables` retorna lista de tabelas com tamanhos nao-zero.
+- Abrir `/admin` no front-end e verificar grafico dinamico e card de tabelas exibidos.
+
+Referencias:
+
+- Nova migracao: `back-end/migrations/versions/a1b2c3d4e5f6_cria_tabela_storage_snapshots.py`.
+- Documentacao PostgreSQL: `pg_database_size`, `pg_stat_user_tables`.
+
+---
+
+### [Data: 2026-02-22] — Player de Audio Interativo (PostDetail e Home)
+
+Motivo da Criacao:
+
+- O player de audio em PostDetail era apenas um link estatico `<a href>` sem controle
+  de reproducao. O card hero da Home tinha um botao Play decorativo sem funcionalidade.
+  A feature implementa reproducao real com controle de progresso, play/pause e seek.
+
+Escopo:
+
+- Front-end: `src/pages/PostDetail.tsx`, `src/pages/Home.tsx`.
+
+Impacto:
+
+- `PostDetail` — `AudioPlayer` completamente reimplementado com `useRef<HTMLAudioElement>`:
+  - Play/pause real com estado `"idle" | "playing" | "paused" | "unavailable"`.
+  - Barra de progresso clicavel (seek por `clientX`).
+  - Exibicao de tempo atual e restante em formato M:SS.
+  - Desabilitado graciosamente quando `audio_url` for null.
+- `Home` — HeroCard com player de audio em tres etapas:
+  - Click inicial busca `GET /v1/posts/:id` para obter `audio_url`.
+  - Cria `Audio` nativo e dispara reproducao.
+  - Botao alterna entre icones Play, Pause, Loader2 e Volume2 conforme estado.
+- Audio parado em `useEffect` cleanup ao desmontar os componentes.
+
+Riscos:
+
+- `audio_url` retornado pelo back-end pode ser null ou expirar; estado `"unavailable"`
+  sinaliza isso ao usuario.
+- Autoplay pode ser bloqueado por politicas do browser em dispositivos iOS quando
+  acionado sem gesto do usuario direto.
+- Na Home, o primeiro click dispara fetch extra (`GET /v1/posts/:id`) antes de criar
+  o `Audio`; latencia de rede adiciona delay visivel.
+
+Migracao:
+
+- Sem migracao de dados. Funciona com qualquer post que tenha `audio_url` preenchido.
+
+Testes:
+
+- Navegar para `/post/:id` com um post que tenha `audio_url` valida → player aparece
+  habilitado, botao play inicia reproducao, barra progride, seek funciona.
+- Post sem `audio_url` → botao play desabilitado (opacidade 40%).
+- Na Home, clicar Play no HeroCard → icone muda para Loader2 → reproducao inicia.
+- Navegar para outra pagina enquanto tocando → audio para sem erros de console.
+
+Referencias:
+
+- `front-end/src/pages/PostDetail.tsx` — componente `AudioPlayer`.
+- `front-end/src/pages/Home.tsx` — funcao `handlePlayAudio` no `HeroCard`.
+
+---
+
+### [Data: 2026-02-22] — Busca Funcional no Feed da Home
+
+Motivo da Criacao:
+
+- A barra de busca na Home era decorativa (input sem estado, sem filtragem). Adicionar
+  busca client-side permite que o usuario encontre reflexoes por titulo, referencia
+  biblica, categoria ou tags sem requisicao adicional ao servidor.
+
+Escopo:
+
+- Front-end: `src/pages/Home.tsx`.
+
+Impacto:
+
+- Input de busca controlado (`searchQuery` no estado do componente `Home`).
+- Botao de microfone removido; substituido por botao de limpar (x) quando ha texto.
+- `RecentPostsSection` filtra a lista de posts em memoria por titulo, referencia,
+  categoria e tags (case-insensitive).
+- Titulo da secao muda para `Resultados para "..."` durante busca ativa.
+- Estado vazio exibe mensagem quando nenhum post corresponde.
+- `HeroCard` e `ChatCTA` ocultados enquanto busca esta ativa.
+- Botao "Ver tudo"/"Ver menos" controla exibicao de mais de 3 posts (constante
+  `INITIAL_VISIBLE = 3`).
+
+Riscos:
+
+- Busca e client-side: so encontra posts ja carregados no feed (ate o limite paginado
+  do `GET /v1/posts/feed`). Posts nao carregados nao aparecem nos resultados.
+- Sem debounce: re-renderizacao a cada caractere digitado; adequado para listas
+  pequenas, pode ser otimizado com `useDeferredValue` para feeds maiores.
+
+Migracao:
+
+- Sem migracao. Feature puramente front-end.
+
+Testes:
+
+- Digitar "Filipenses" na barra de busca → apenas posts com essa referencia exibidos.
+- Busca sem resultados → mensagem "Nenhuma reflexao encontrada para ...".
+- Limpar busca (botao x) → feed completo restaurado com HeroCard e ChatCTA.
+- Clicar "Ver tudo" → todos os posts visiveis; "Ver menos" colapsa para 3.
+
+Referencias:
+
+- `front-end/src/pages/Home.tsx` — `RecentPostsSection` e prop `searchQuery`.
+
+---
+
+### [Data: 2026-02-22] — Utilitarios de Data/Hora Localizados (utils.ts)
+
+Motivo da Criacao:
+
+- Multiplos componentes implementavam formatacao de datas de forma independente e
+  inconsistente (algumas em UTC, outras com `toLocaleDateString` inline). Centralizar
+  em `utils.ts` garante comportamento uniforme no fuso horario do browser do usuario.
+
+Escopo:
+
+- Front-end: `src/lib/utils.ts`, `src/pages/AdminDatabaseMonitor.tsx`,
+  `src/components/therapist/PatientDetail.tsx`.
+
+Impacto:
+
+- `formatLocalDate(iso)` — converte ISO UTC para data local em pt-BR ("DD/MM/AAAA").
+- `formatLocalDateTime(iso)` — converte ISO UTC para data+hora local em pt-BR.
+- `timeAgoLocal(iso)` — tempo relativo para eventos recentes; data/hora completa
+  para eventos com mais de 24h. Substitui `timeAgo()` que estava inline em
+  `AdminDatabaseMonitor.tsx` (retornava apenas "Nd atras" sem data real).
+- `PatientDetail.tsx` usa `formatLocalDateTime` para exibir a data de inicio do paciente.
+
+Riscos:
+
+- Formatacao dependente do locale do sistema operacional do usuario; pode variar
+  em ambientes sem suporte a pt-BR (raro em browsers modernos).
+
+Migracao:
+
+- Sem migracao. Funcoes exportadas; componentes que usavam logica inline devem
+  importar de `@/lib/utils`.
+
+Testes:
+
+- `formatLocalDate("2026-02-22T03:00:00Z")` → retorna data no fuso local do browser.
+- `timeAgoLocal` com ISO de 5 min atras → "5m atras".
+- `timeAgoLocal` com ISO de 2 dias atras → data/hora formatada (nao "48h atras").
+
+Referencias:
+
+- `front-end/src/lib/utils.ts`.

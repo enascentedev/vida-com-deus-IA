@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/vida_com_deus"
 
+    # Render — tamanho do banco contratado (em bytes)
+    # Free: 1_073_741_824 (1 GB) | Starter: 10_737_418_240 (10 GB) | Standard: 37_580_963_840 (35 GB)
+    render_db_size_bytes: int = 1_073_741_824
+
     # Redis (Fase 2)
     redis_url: str = "redis://localhost:6379/0"
 

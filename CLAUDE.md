@@ -112,8 +112,9 @@ Documentação interativa disponível em `http://localhost:8000/docs` (Swagger U
 ### Camadas
 
 **Estado atual (Fase 2):** Modelos SQLAlchemy 2.0 async, repositórios e serviços implementados.
-Migrações Alembic para PostgreSQL com 3 versões cobrindo todos os domínios.
+Migrações Alembic para PostgreSQL com 4 versões cobrindo todos os domínios (incluindo `storage_snapshots`).
 Chat bíblico integrado ao GPT-4o-mini (fallback mock quando `OPENAI_API_KEY` ausente).
+Métricas de storage e alertas do admin agora leem dados reais do PostgreSQL via `pg_database_size()`.
 Arquivos JSON locais (`data/`) mantidos como fallback de leitura durante transição.
 Redis planejado para Fase 3.
 
@@ -126,7 +127,7 @@ app/
 ├── models/          # Modelos SQLAlchemy 2.0 (User, Post, Favorite, Conversation, etc.)
 ├── repositories/    # Acesso a dados async (user, post, library, chat)
 └── services/        # Lógica de negócio (auth, user, post, library, chat)
-migrations/          # Alembic — 3 migrações versionadas
+migrations/          # Alembic — 4 migrações versionadas (inclui storage_snapshots)
 data/                # Persistência JSON local (fallback Fase 1.5)
 ├── posts.json       # Posts coletados pelo ETL
 ├── patients.json    # Pacientes do dashboard do psicólogo
@@ -151,7 +152,7 @@ data/                # Persistência JSON local (fallback Fase 1.5)
 | Biblioteca | `GET /v1/library/`, `POST/DELETE /v1/library/favorites/{id}` |
 | Chat | `POST/GET /v1/chat/conversations`, `POST/GET /v1/chat/conversations/{id}/messages` |
 | Therapist | `GET /v1/therapist/overview`, `GET/POST /v1/therapist/patients`, `GET/PATCH /v1/therapist/patients/{id}`, `PATCH .../status`, `PATCH .../limit`, `GET/POST .../sessions`, `PATCH .../sessions/{sid}` |
-| Admin | `GET /v1/admin/metrics/storage`, `GET /v1/admin/alerts`, `POST /v1/admin/etl/runs/execute` |
+| Admin | `GET /v1/admin/metrics/storage`, `GET /v1/admin/metrics/growth`, `GET /v1/admin/metrics/tables`, `GET /v1/admin/alerts`, `GET /v1/admin/etl/runs`, `POST /v1/admin/etl/runs/execute` |
 | Health | `GET /health` |
 
 ---
