@@ -38,6 +38,50 @@ O projeto nasceu como um frontend Vue.js e passou por uma reescrita completa —
 
 ---
 
+## 🖼️ Screenshots das Páginas
+
+- **Landing (/landing)** — herói com call-to-action para captar novos usuários.
+  
+  ![Landing](front-end/screenshots/imagens-readme/landing.png)
+
+- **Login (/login)** — acesso seguro com formulário simples e claro.
+  
+  ![Login](front-end/screenshots/imagens-readme/login.png)
+
+- **Cadastro (/cadastro)** — criação de conta com validações básicas.
+  
+  ![Cadastro](front-end/screenshots/imagens-readme/cadastro.png)
+
+- **Recuperar Senha (/recuperar-senha)** — fluxo de recuperação por e-mail.
+  
+  ![Recuperar Senha](front-end/screenshots/imagens-readme/recuperar-senha.png)
+
+- **Home (/)** — post do dia em destaque, posts recentes e CTA para chat bíblico.
+  
+  ![Home](front-end/screenshots/imagens-readme/home.png)
+
+- **Post Detalhe (/post/:id)** — player de áudio do devocional, resumo por IA, tags e aba devocional completa.
+  
+  ![Post Detalhe](front-end/screenshots/imagens-readme/post-detalhe.png)
+
+- **Chat Bíblico (/chat)** — conversa com IA com sugestões e respostas citadas.
+  
+  ![Chat](front-end/screenshots/imagens-readme/chat.png)
+
+- **Biblioteca (/biblioteca)** — favoritos e histórico pessoal de leituras.
+  
+  ![Biblioteca](front-end/screenshots/imagens-readme/biblioteca.png)
+
+- **Configurações (/configuracoes)** — ajustes de perfil, tema e preferências de IA/notificações.
+  
+  ![Configurações](front-end/screenshots/imagens-readme/configuracoes.png)
+
+- **Admin Monitor (/admin)** — painel com métricas, execuções de ETL e alertas operacionais.
+  
+  ![Admin](front-end/screenshots/imagens-readme/admin.png)
+
+---
+
 ## 🏗️ Estrutura do Projeto
 
 ```text
