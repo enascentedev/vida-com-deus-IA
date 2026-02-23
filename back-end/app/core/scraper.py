@@ -30,12 +30,43 @@ _HEADERS = {
     ),
 }
 
+# Suporta intervalo com traço ("15:23-24"), meia-risca ("15:23–24")
+# e conector português "e" ("15:23 e 24")
 _VERSE_REF_RE = re.compile(
     r"((?:[1-3]\s*)?[A-ZÀ-Ú][a-zà-ú]+(?:\s+[a-zà-ú]+)*)"
-    r"\s+(\d+[.:]\d+(?:\s*[-–]\s*\d+)?)"
+    r"\s+(\d+[.:]\d+(?:\s*(?:[-–]|e)\s*\d+)?)"
     r"\s*[-–]\s*(.+)",
     re.DOTALL,
 )
+
+# Meses do calendário português → número com zero à esquerda
+_MONTH_BR: dict[str, str] = {
+    "janeiro": "01", "fevereiro": "02", "março": "03",
+    "abril": "04", "maio": "05", "junho": "06",
+    "julho": "07", "agosto": "08", "setembro": "09",
+    "outubro": "10", "novembro": "11", "dezembro": "12",
+}
+
+
+def _parse_date_br(date_text: str) -> str:
+    """Converte '22 de fevereiro de 2026' → '2026-02-22' (ISO 8601).
+
+    Retorna a string original inalterada se o padrão não casar.
+    """
+    if not date_text:
+        return date_text
+    m = re.match(
+        r"(\d{1,2})\s+de\s+([a-záéíóúâêîôûãõç]+)\s+de\s+(\d{4})",
+        date_text,
+        re.IGNORECASE,
+    )
+    if m:
+        day = m.group(1).zfill(2)
+        month = _MONTH_BR.get(m.group(2).lower())
+        year = m.group(3)
+        if month:
+            return f"{year}-{month}-{day}"
+    return date_text
 
 _PROMO_MARKERS = [
     "Saiba como receber",
@@ -196,7 +227,9 @@ async def run_etl(db: AsyncSession) -> dict:
         posts_collected = 0
         new_posts = 0
 
-        for item in post_items[:20]:
+        # Inverte a ordem: processa do mais antigo para o mais recente,
+        # garantindo que os posts mais recentes tenham o maior created_at.
+        for item in reversed(post_items[:20]):
             if not isinstance(item, Tag):
                 continue
 
@@ -212,7 +245,8 @@ async def run_etl(db: AsyncSession) -> dict:
             if not title or not href:
                 continue
 
-            date_text = date_el.get_text(strip=True) if date_el else ""
+            date_raw = date_el.get_text(strip=True) if date_el else ""
+            date_text = _parse_date_br(date_raw)  # "2026-02-22" ou texto original
             excerpt_text = excerpt_el.get_text(separator=" ", strip=True) if excerpt_el else ""
 
             img_el = item.select_one("div.image_wrapper img")

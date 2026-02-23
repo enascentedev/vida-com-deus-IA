@@ -109,7 +109,16 @@ export interface ETLRun {
   error: string | null
 }
 export interface ETLRunsResponse { runs: ETLRun[] }
-export interface ETLExecuteResponse { run_id: string; message: string; status: string }
+export interface ETLExecuteResponse {
+  run_id: string
+  message: string
+  status: string
+  posts_collected: number
+  new_posts: number
+  started_at: string
+  finished_at: string
+  duration: string
+}
 export interface SystemAlert {
   id: string
   title: string

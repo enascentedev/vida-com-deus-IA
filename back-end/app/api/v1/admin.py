@@ -211,6 +211,11 @@ async def execute_etl_endpoint(
         run_id=run_id,
         message=result.get("message", "ETL concluído."),
         status=status,
+        posts_collected=result.get("posts_collected", 0),
+        new_posts=result.get("new_posts", 0),
+        started_at=result.get("started_at", started_at),
+        finished_at=result.get("finished_at", _now_iso()),
+        duration=duration,
     )
 
 

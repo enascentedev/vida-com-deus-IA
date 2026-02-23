@@ -3,6 +3,7 @@ import { Heart, Share2, Play, Pause, CheckCircle, BookOpen, Sparkles, Check } fr
 import { useParams, useNavigate } from "react-router-dom"
 import { postsApi, libraryApi } from "@/lib/api"
 import type { PostDetail as PostDetailType } from "@/lib/api"
+import { fmtPostDate } from "@/lib/utils"
 import { Badge, Skeleton } from "vida-com-deus-ui"
 import { SecondaryTopbar } from "@/components/layout/SecondaryTopbar"
 
@@ -348,7 +349,7 @@ export function PostDetail() {
             <Badge className="text-xs font-semibold px-2 py-0.5 bg-blue-600/10 text-blue-600 border-none hover:bg-blue-600/10">
               {post?.category ?? ""}
             </Badge>
-            <span className="text-xs text-slate-400">{post?.date ?? ""}</span>
+            <span className="text-xs text-slate-400">{fmtPostDate(post?.date ?? "")}</span>
           </div>
         </div>
 

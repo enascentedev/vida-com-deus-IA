@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
-import { RefreshCw, Sparkles, FileText, AlertTriangle, Play } from "lucide-react"
+import { RefreshCw, Sparkles, FileText, AlertTriangle, Play, CheckCircle, XCircle } from "lucide-react"
 import { adminApi } from "@/lib/api"
-import type { StorageMetric, GrowthMetric, ETLRun, SystemAlert, TableStat } from "@/lib/api"
+import type { StorageMetric, GrowthMetric, ETLRun, SystemAlert, TableStat, ETLExecuteResponse } from "@/lib/api"
 import { timeAgoLocal } from "@/lib/utils"
 import { Skeleton } from "vida-com-deus-ui"
 import { SecondaryTopbar } from "@/components/layout/SecondaryTopbar"
@@ -319,6 +319,129 @@ function TableBreakdownCard({ tables, isLoading }: { tables: TableStat[]; isLoad
 }
 
 /* -------------------------------------------------------------------------- */
+/*  ETL — Painel de etapas (exibido enquanto a ETL executa)                   */
+/* -------------------------------------------------------------------------- */
+const ETL_STEPS = [
+  { label: "Conectando ao wgospel.com", delay: 0 },
+  { label: "Buscando lista de reflexões", delay: 2500 },
+  { label: "Coletando conteúdo dos posts", delay: 6000 },
+  { label: "Processando textos e versículos", delay: 10000 },
+  { label: "Salvando no banco de dados", delay: 14000 },
+]
+
+function ETLProgressPanel({ isExecuting }: { isExecuting: boolean }) {
+  const [step, setStep] = useState(-1)
+
+  useEffect(() => {
+    if (!isExecuting) {
+      setStep(-1)
+      return
+    }
+    setStep(0)
+    const timers = ETL_STEPS.slice(1).map((s, i) =>
+      window.setTimeout(() => setStep(i + 1), s.delay)
+    )
+    return () => timers.forEach(clearTimeout)
+  }, [isExecuting])
+
+  if (!isExecuting) return null
+
+  return (
+    <div className="px-4 pb-4 border-t border-slate-50 pt-3 space-y-2.5">
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">
+        Progresso
+      </p>
+      {ETL_STEPS.map(({ label }, i) => {
+        const isDone = i < step
+        const isActive = i === step
+        return (
+          <div key={label} className="flex items-center gap-2.5">
+            {isDone ? (
+              <CheckCircle size={15} className="text-green-500 flex-shrink-0" />
+            ) : isActive ? (
+              <div className="size-[15px] rounded-full border-2 border-blue-600 border-t-transparent animate-spin flex-shrink-0" />
+            ) : (
+              <div className="size-[15px] rounded-full border-2 border-slate-200 flex-shrink-0" />
+            )}
+            <span
+              className={`text-sm transition-colors ${
+                isDone
+                  ? "text-slate-400 line-through"
+                  : isActive
+                  ? "text-slate-900 font-semibold"
+                  : "text-slate-300"
+              }`}
+            >
+              {label}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/*  ETL — Modal de resultado (exibido ao finalizar)                            */
+/* -------------------------------------------------------------------------- */
+function ETLResultModal({ result, onClose }: { result: ETLExecuteResponse; onClose: () => void }) {
+  const isSuccess = result.status === "success"
+  const isWarning = result.status === "warning"
+
+  const iconBg = isSuccess ? "bg-green-100" : isWarning ? "bg-yellow-100" : "bg-red-100"
+  const Icon = isSuccess ? CheckCircle : isWarning ? AlertTriangle : XCircle
+  const iconColor = isSuccess ? "text-green-600" : isWarning ? "text-yellow-600" : "text-red-600"
+  const title = isSuccess ? "ETL Concluída!" : isWarning ? "ETL com Alertas" : "ETL Falhou"
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md bg-white rounded-t-3xl px-6 pt-6 pb-8 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Puxador */}
+        <div className="w-10 h-1 rounded-full bg-slate-200 mx-auto mb-6" />
+
+        {/* Ícone + título */}
+        <div className="flex flex-col items-center mb-6">
+          <div className={`size-16 rounded-full ${iconBg} flex items-center justify-center mb-3`}>
+            <Icon size={32} className={iconColor} />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900">{title}</h2>
+          <p className="text-slate-400 text-sm mt-1 text-center leading-snug">{result.message}</p>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="bg-slate-50 rounded-2xl p-3 text-center">
+            <p className="text-2xl font-bold text-slate-900">{result.posts_collected}</p>
+            <p className="text-xs text-slate-400 mt-0.5">Coletados</p>
+          </div>
+          <div className="bg-green-50 rounded-2xl p-3 text-center">
+            <p className="text-2xl font-bold text-green-600">{result.new_posts}</p>
+            <p className="text-xs text-slate-400 mt-0.5">Novos</p>
+          </div>
+          <div className="bg-blue-50 rounded-2xl p-3 text-center">
+            <p className="text-2xl font-bold text-blue-600">{result.duration || "—"}</p>
+            <p className="text-xs text-slate-400 mt-0.5">Duração</p>
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full py-3 bg-blue-600 text-white rounded-2xl font-semibold text-sm shadow-md shadow-blue-600/20"
+        >
+          Fechar
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Card de Ingestão de IA (ETL)                                               */
 /* -------------------------------------------------------------------------- */
 function ETLCard({
@@ -340,9 +463,9 @@ function ETLCard({
             Ingestão de IA (ETL)
           </h3>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="size-2 rounded-full bg-green-500" />
+            <span className={`size-2 rounded-full ${isExecuting ? "bg-blue-500 animate-pulse" : "bg-green-500"}`} />
             <span className="text-xs text-slate-400 font-medium">
-              Sistema Idle
+              {isExecuting ? "Executando" : "Sistema Idle"}
             </span>
           </div>
         </div>
@@ -355,6 +478,10 @@ function ETLCard({
           {isExecuting ? "Executando..." : "Executar"}
         </button>
       </div>
+
+      {/* Painel de etapas — visível somente durante a execução */}
+      <ETLProgressPanel isExecuting={isExecuting} />
+
       <div className="p-4">
         <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-3">
           Execuções Recentes
@@ -492,6 +619,7 @@ export function AdminDatabaseMonitor() {
   const [isLoading, setIsLoading] = useState(true)
   const [isExecutingEtl, setIsExecutingEtl] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [etlResult, setEtlResult] = useState<ETLExecuteResponse | null>(null)
 
   const setters = { setStorage, setGrowth, setEtlRuns, setAlerts, setTables }
 
@@ -510,8 +638,10 @@ export function AdminDatabaseMonitor() {
 
   async function handleExecuteEtl() {
     setIsExecutingEtl(true)
+    setEtlResult(null)
     try {
-      await adminApi.executeEtl()
+      const result = await adminApi.executeEtl()
+      setEtlResult(result)
       const data = await adminApi.getEtlRuns()
       setEtlRuns(data.runs)
     } catch { /* erro silencioso */ } finally {
@@ -552,6 +682,11 @@ export function AdminDatabaseMonitor() {
         />
         <AlertsTable alerts={alerts} isLoading={isLoading} />
       </main>
+
+      {/* Modal de resultado — aparece ao finalizar a ETL */}
+      {etlResult && (
+        <ETLResultModal result={etlResult} onClose={() => setEtlResult(null)} />
+      )}
     </div>
   )
 }

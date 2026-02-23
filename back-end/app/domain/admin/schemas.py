@@ -40,6 +40,11 @@ class ETLExecuteResponse(BaseModel):
     run_id: str
     message: str
     status: str
+    posts_collected: int = 0
+    new_posts: int = 0
+    started_at: str = ""
+    finished_at: str = ""
+    duration: str = ""
 
 
 class SystemAlert(BaseModel):

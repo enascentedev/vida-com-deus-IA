@@ -15,6 +15,7 @@ import {
 import { useNavigate } from "react-router-dom"
 import { postsApi } from "@/lib/api"
 import type { FeedResponse, PostSummary } from "@/lib/api"
+import { fmtPostDate } from "@/lib/utils"
 import { useAuthStore } from "@/store/useAuthStore"
 import { Button, Badge, Skeleton } from "vida-com-deus-ui"
 import { BottomNavigation } from "@/components/layout/BottomNavigation"
@@ -196,7 +197,7 @@ function HeroCard({ post }: { post: PostSummary | null }) {
             </div>
           ) : (
             <>
-              <p className="text-xs opacity-80 mb-1 uppercase font-medium">{post.date}</p>
+              <p className="text-xs opacity-80 mb-1 uppercase font-medium">{fmtPostDate(post.date)}</p>
               <h2 className="text-2xl font-bold leading-tight mb-3">{post.title}</h2>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 text-sm">
@@ -284,7 +285,7 @@ function RecentPost({ post }: { post: PostSummary }) {
           )}
           {/* Data */}
           <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wide">
-            {post.date}
+            {fmtPostDate(post.date)}
           </p>
           {/* Título */}
           <h3 className="font-bold text-slate-800 leading-snug line-clamp-2 text-[15px]">

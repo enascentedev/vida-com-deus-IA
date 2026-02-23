@@ -20,7 +20,7 @@ class PostRepository:
         stmt = (
             select(Post)
             .options(selectinload(Post.tags))
-            .order_by(Post.created_at.desc())
+            .order_by(Post.date.desc().nullslast(), Post.created_at.desc())
             .limit(5)
         )
         result = await self.db.execute(stmt)
@@ -47,7 +47,7 @@ class PostRepository:
                 )
             )
 
-        stmt = stmt.order_by(Post.created_at.desc())
+        stmt = stmt.order_by(Post.date.desc().nullslast(), Post.created_at.desc())
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
@@ -63,7 +63,11 @@ class PostRepository:
 
     async def get_by_source_url(self, source_url: str) -> Post | None:
         """Busca post pela URL de origem (usada no upsert do ETL)."""
-        stmt = select(Post).where(Post.source_url == source_url)
+        stmt = (
+            select(Post)
+            .options(selectinload(Post.tags))
+            .where(Post.source_url == source_url)
+        )
         result = await self.db.execute(stmt)
         return result.scalars().first()
 
