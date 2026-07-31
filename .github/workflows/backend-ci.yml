@@ -1,0 +1,102 @@
+# CI do back-end — valida configuração, migrations, lint, tipos e testes
+# contra um PostgreSQL real. Nenhum segredo verdadeiro é usado: o JWT_SECRET_KEY
+# é gerado dentro do próprio job.
+name: backend-ci
+
+on:
+  push:
+    branches: ["main"]
+    paths: ["back-end/**", ".github/workflows/backend-ci.yml"]
+  pull_request:
+    paths: ["back-end/**", ".github/workflows/backend-ci.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: back-end
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vida_com_deus_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/vida_com_deus_test
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/vida_com_deus_test
+      REQUIRE_DB: "1"
+      ENVIRONMENT: development
+
+    steps:
+      # 1. checkout
+      - uses: actions/checkout@v4
+
+      # 2. Python + 3. cache (setup-uv restaura o cache do uv)
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "back-end/uv.lock"
+
+      - name: Configurar Python
+        run: uv python install 3.13
+
+      # 5. instalação
+      - name: Instalar dependências
+        run: uv sync --frozen
+
+      # Segredo efêmero do job — nunca um valor fixo no repositório
+      - name: Gerar JWT_SECRET_KEY do job
+        run: echo "JWT_SECRET_KEY=$(uv run python -c 'import secrets; print(secrets.token_urlsafe(48))')" >> "$GITHUB_ENV"
+
+      # 6. validação de configuração
+      - name: Validar configuração
+        run: uv run python -m app.core.config_check
+
+      # 7. migrations em banco limpo
+      - name: Aplicar migrations
+        run: uv run alembic upgrade head
+
+      - name: Verificar rollback da última migration
+        run: |
+          uv run alembic downgrade -1
+          uv run alembic upgrade head
+
+      # 8. lint
+      - name: Ruff
+        run: uv run ruff check .
+
+      # 9. format check
+      - name: Black (verificação, sem modificar)
+        run: uv run black --check .
+
+      # 10. type-check
+      - name: Mypy
+        run: uv run mypy app
+
+      # 11. testes + 12. cobertura (mínimo de 80% nos módulos de auth/autorização)
+      - name: Testes com cobertura
+        run: >-
+          uv run pytest -v
+          --cov=app.core.security
+          --cov=app.core.dependencies
+          --cov=app.core.config
+          --cov=app.services.auth_service
+          --cov=app.repositories.user_repository
+          --cov=app.domain.auth
+          --cov-report=term-missing
+          --cov-fail-under=80
+
+      # 13. import da aplicação
+      - name: Importar aplicação
+        run: uv run python -c "import app.main; print('aplicação importa sem erros')"
