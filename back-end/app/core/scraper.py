@@ -12,7 +12,7 @@ Estrutura DOM da listagem (tema BeTheme/WordPress):
 """
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from bs4 import BeautifulSoup, Tag
@@ -41,10 +41,18 @@ _VERSE_REF_RE = re.compile(
 
 # Meses do calendário português → número com zero à esquerda
 _MONTH_BR: dict[str, str] = {
-    "janeiro": "01", "fevereiro": "02", "março": "03",
-    "abril": "04", "maio": "05", "junho": "06",
-    "julho": "07", "agosto": "08", "setembro": "09",
-    "outubro": "10", "novembro": "11", "dezembro": "12",
+    "janeiro": "01",
+    "fevereiro": "02",
+    "março": "03",
+    "abril": "04",
+    "maio": "05",
+    "junho": "06",
+    "julho": "07",
+    "agosto": "08",
+    "setembro": "09",
+    "outubro": "10",
+    "novembro": "11",
+    "dezembro": "12",
 }
 
 
@@ -68,6 +76,7 @@ def _parse_date_br(date_text: str) -> str:
             return f"{year}-{month}-{day}"
     return date_text
 
+
 _PROMO_MARKERS = [
     "Saiba como receber",
     "No celular, instale",
@@ -85,7 +94,7 @@ _PROMO_MARKERS = [
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _is_promo(text: str) -> bool:
@@ -160,12 +169,12 @@ def _scrape_post_detail(url: str, client: httpx.Client) -> dict:
         return result
 
     header_idx = -1
-    for i, p in enumerate(paragraphs):
-        if re.match(r"TEMPO DE REFLETIR \d+", p):
+    for i, paragraph in enumerate(paragraphs):
+        if re.match(r"TEMPO DE REFLETIR \d+", paragraph):
             header_idx = i
             break
 
-    content_paragraphs = paragraphs[header_idx + 1:] if header_idx >= 0 else paragraphs
+    content_paragraphs = paragraphs[header_idx + 1 :] if header_idx >= 0 else paragraphs
 
     if content_paragraphs:
         first = content_paragraphs[0]
@@ -175,21 +184,21 @@ def _scrape_post_detail(url: str, client: httpx.Client) -> dict:
             content_paragraphs = content_paragraphs[1:]
 
     prayer_idx = -1
-    for i, p in enumerate(content_paragraphs):
-        if "ore comigo" in p.lower() or "reflita sobre isso" in p.lower():
+    for i, paragraph in enumerate(content_paragraphs):
+        if "ore comigo" in paragraph.lower() or "reflita sobre isso" in paragraph.lower():
             prayer_idx = i
             break
 
     if prayer_idx >= 0:
         body_parts = content_paragraphs[:prayer_idx]
         remaining = content_paragraphs[prayer_idx:]
-        for p in remaining:
-            if p.startswith(("Pai,", "Senhor,", "Deus,", "Jesus,")):
-                result["devotional_prayer"] = p
+        for paragraph in remaining:
+            if paragraph.startswith(("Pai,", "Senhor,", "Deus,", "Jesus,")):
+                result["devotional_prayer"] = paragraph
                 break
-            if "ore comigo" in p.lower() or "reflita sobre" in p.lower():
+            if "ore comigo" in paragraph.lower() or "reflita sobre" in paragraph.lower():
                 continue
-            result["devotional_prayer"] = p
+            result["devotional_prayer"] = paragraph
             break
     else:
         body_parts = content_paragraphs
@@ -252,13 +261,11 @@ async def run_etl(db: AsyncSession) -> dict:
             img_el = item.select_one("div.image_wrapper img")
             thumbnail_url = None
             if img_el:
-                thumbnail_url = (
-                    img_el.get("src")
-                    or img_el.get("data-src")
-                    or img_el.get("data-lazy-src")
-                )
-                if thumbnail_url and not thumbnail_url.startswith("http"):
-                    thumbnail_url = "https://www.wgospel.com" + thumbnail_url
+                raw_src = img_el.get("src") or img_el.get("data-src") or img_el.get("data-lazy-src")
+                if raw_src:
+                    thumbnail_url = str(raw_src)
+                    if not thumbnail_url.startswith("http"):
+                        thumbnail_url = "https://www.wgospel.com" + thumbnail_url
 
             reference, verse_snippet = _parse_excerpt_reference(excerpt_text)
 

@@ -2,22 +2,21 @@ import asyncio
 import sys
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from alembic import context
-
 # Importações do projeto
 from app.core.config import settings
 from app.models.base import Base
+from app.models.chat import ChatCitation, ChatConversation, ChatMessage  # noqa: F401
+from app.models.library import Favorite, ReadingHistory  # noqa: F401
+from app.models.post import Post, PostTag  # noqa: F401
 
 # Importar todos os modelos para que o Alembic os detecte no autogenerate
 # (adicionar imports aqui conforme novos modelos forem criados)
-from app.models.user import User, RefreshToken, PasswordResetToken, UserSettings  # noqa: F401
-from app.models.post import Post, PostTag  # noqa: F401
-from app.models.library import Favorite, ReadingHistory  # noqa: F401
-from app.models.chat import ChatConversation, ChatMessage, ChatCitation  # noqa: F401
+from app.models.user import PasswordResetToken, RefreshToken, User, UserSettings  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

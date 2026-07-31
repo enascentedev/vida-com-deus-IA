@@ -19,7 +19,8 @@ def read_json(filename: str) -> list | dict:
     if not path.exists():
         return {}
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        data: list | dict = json.load(f)
+    return data
 
 
 def write_json(filename: str, data: list | dict) -> None:

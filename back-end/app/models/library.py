@@ -1,18 +1,20 @@
 import uuid
+from typing import TYPE_CHECKING
 
 from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
 
+if TYPE_CHECKING:
+    from app.models.post import Post
+
 
 class Favorite(BaseModel):
     """Favorito de um post pelo usuário."""
 
     __tablename__ = "favorites"
-    __table_args__ = (
-        UniqueConstraint("user_id", "post_id", name="uq_favorite_user_post"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "post_id", name="uq_favorite_user_post"),)
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
@@ -21,7 +23,7 @@ class Favorite(BaseModel):
         ForeignKey("posts.id", ondelete="CASCADE"), index=True
     )
 
-    post: Mapped["Post"] = relationship("Post", lazy="noload")  # type: ignore[name-defined]
+    post: Mapped["Post"] = relationship("Post", lazy="noload")
 
 
 class ReadingHistory(BaseModel):
@@ -36,4 +38,4 @@ class ReadingHistory(BaseModel):
         ForeignKey("posts.id", ondelete="CASCADE"), index=True
     )
 
-    post: Mapped["Post"] = relationship("Post", lazy="noload")  # type: ignore[name-defined]
+    post: Mapped["Post"] = relationship("Post", lazy="noload")

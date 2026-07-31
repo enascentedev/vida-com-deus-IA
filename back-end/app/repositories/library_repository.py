@@ -33,25 +33,19 @@ class LibraryRepository:
         if query:
             favorites = [f for f in favorites if query.lower() in f.post.title.lower()]
         if tag:
-            favorites = [
-                f for f in favorites if any(t.name == tag for t in f.post.tags)
-            ]
+            favorites = [f for f in favorites if any(t.name == tag for t in f.post.tags)]
         return favorites
 
     async def is_favorited(self, user_id: uuid.UUID, post_id: uuid.UUID) -> bool:
         """Verifica se o post já está nos favoritos do usuário."""
-        stmt = select(Favorite).where(
-            Favorite.user_id == user_id, Favorite.post_id == post_id
-        )
+        stmt = select(Favorite).where(Favorite.user_id == user_id, Favorite.post_id == post_id)
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none() is not None
 
     async def add_favorite(self, user_id: uuid.UUID, post_id: uuid.UUID) -> Favorite:
         """Adiciona favorito. Se já existe, retorna o existente."""
         existing = await self.db.execute(
-            select(Favorite).where(
-                Favorite.user_id == user_id, Favorite.post_id == post_id
-            )
+            select(Favorite).where(Favorite.user_id == user_id, Favorite.post_id == post_id)
         )
         fav = existing.scalar_one_or_none()
         if fav:
@@ -64,9 +58,7 @@ class LibraryRepository:
         except IntegrityError:
             await self.db.rollback()
             result = await self.db.execute(
-                select(Favorite).where(
-                    Favorite.user_id == user_id, Favorite.post_id == post_id
-                )
+                select(Favorite).where(Favorite.user_id == user_id, Favorite.post_id == post_id)
             )
             fav = result.scalar_one()
         return fav
@@ -74,9 +66,7 @@ class LibraryRepository:
     async def remove_favorite(self, user_id: uuid.UUID, post_id: uuid.UUID) -> None:
         """Remove favorito se existir."""
         await self.db.execute(
-            delete(Favorite).where(
-                Favorite.user_id == user_id, Favorite.post_id == post_id
-            )
+            delete(Favorite).where(Favorite.user_id == user_id, Favorite.post_id == post_id)
         )
 
     async def list_history(
@@ -98,14 +88,10 @@ class LibraryRepository:
         if query:
             history = [h for h in history if query.lower() in h.post.title.lower()]
         if tag:
-            history = [
-                h for h in history if any(t.name == tag for t in h.post.tags)
-            ]
+            history = [h for h in history if any(t.name == tag for t in h.post.tags)]
         return history
 
-    async def record_history(
-        self, user_id: uuid.UUID, post_id: uuid.UUID
-    ) -> ReadingHistory:
+    async def record_history(self, user_id: uuid.UUID, post_id: uuid.UUID) -> ReadingHistory:
         """Registra acesso ao post no histórico de leitura."""
         entry = ReadingHistory(user_id=user_id, post_id=post_id)
         self.db.add(entry)

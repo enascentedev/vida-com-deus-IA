@@ -39,11 +39,7 @@ def _post_to_detail(post: Post) -> PostDetail:
         import re
 
         sentences = re.split(r"(?<=[.!?])\s+", post.body_text)
-        key_points = [
-            PostKeyPoint(text=s)
-            for s in sentences[:5]
-            if 20 < len(s) < 200
-        ][:3]
+        key_points = [PostKeyPoint(text=s) for s in sentences[:5] if 20 < len(s) < 200][:3]
 
     return PostDetail(
         id=str(post.id),
@@ -98,7 +94,7 @@ class PostService:
         try:
             pid = uuid.UUID(post_id)
         except ValueError:
-            raise HTTPException(status_code=404, detail="Post não encontrado.")
+            raise HTTPException(status_code=404, detail="Post não encontrado.") from None
 
         post = await self.repo.get_by_id(pid)
         if not post:
@@ -111,7 +107,7 @@ class PostService:
         try:
             pid = uuid.UUID(post_id)
         except ValueError:
-            raise HTTPException(status_code=404, detail="Post não encontrado.")
+            raise HTTPException(status_code=404, detail="Post não encontrado.") from None
 
         post = await self.repo.get_by_id(pid)
         if not post:

@@ -1,5 +1,5 @@
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
@@ -26,19 +26,20 @@ from app.domain.admin.schemas import (
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 _GB = 1_073_741_824  # bytes em 1 GiB
-_MB = 1_048_576      # bytes em 1 MiB
+_MB = 1_048_576  # bytes em 1 MiB
 
 # Nomes dos dias da semana em pt-BR (weekday() → 0=Seg … 6=Dom)
 _WEEKDAY = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 # ---------------------------------------------------------------------------
 #  Métricas de armazenamento (dados reais do PostgreSQL)
 # ---------------------------------------------------------------------------
+
 
 @router.get("/metrics/storage", response_model=StorageMetric)
 async def get_storage_metrics(
@@ -85,18 +86,14 @@ async def get_growth_metrics(
     db: AsyncSession = Depends(get_db),
 ) -> GrowthMetric:
     """Calcula crescimento dos últimos 7 dias a partir dos snapshots diários."""
-    rows = (
-        await db.execute(
-            text("""
+    rows = (await db.execute(text("""
                 SELECT DISTINCT ON (DATE(measured_at))
                     DATE(measured_at) AS day,
                     used_bytes
                 FROM storage_snapshots
                 ORDER BY DATE(measured_at) DESC, measured_at DESC
                 LIMIT 7
-            """)
-        )
-    ).mappings().fetchall()
+            """))).mappings().fetchall()
 
     if not rows:
         return GrowthMetric(percentage="+0%", growth_gb="0.00", history=[])
@@ -134,9 +131,7 @@ async def get_table_metrics(
     db: AsyncSession = Depends(get_db),
 ) -> TableBreakdownResponse:
     """Retorna tamanho real de cada tabela do banco via pg_stat_user_tables."""
-    rows = (
-        await db.execute(
-            text("""
+    rows = (await db.execute(text("""
                 SELECT
                     relname                              AS table_name,
                     pg_total_relation_size(relid)        AS total_bytes,
@@ -146,9 +141,7 @@ async def get_table_metrics(
                 FROM pg_stat_user_tables
                 ORDER BY total_bytes DESC
                 LIMIT 15
-            """)
-        )
-    ).mappings().fetchall()
+            """))).mappings().fetchall()
 
     tables = [
         TableStat(
@@ -168,6 +161,7 @@ async def get_table_metrics(
 # ---------------------------------------------------------------------------
 #  ETL
 # ---------------------------------------------------------------------------
+
 
 @router.get("/etl/runs", response_model=ETLRunsResponse)
 def list_etl_runs(user_id: str = Depends(get_current_user_id)) -> ETLRunsResponse:
@@ -198,14 +192,16 @@ async def execute_etl_endpoint(
     status = result.get("status", "success")
     run_id = f"etl-manual-{started_at}"
 
-    append_etl_run({
-        "id": run_id,
-        "name": "Scraping wgospel.com",
-        "status": "success" if status == "success" else "failed",
-        "started_at": started_at,
-        "duration": duration,
-        "error": result.get("error"),
-    })
+    append_etl_run(
+        {
+            "id": run_id,
+            "name": "Scraping wgospel.com",
+            "status": "success" if status == "success" else "failed",
+            "started_at": started_at,
+            "duration": duration,
+            "error": result.get("error"),
+        }
+    )
 
     return ETLExecuteResponse(
         run_id=run_id,
@@ -223,6 +219,7 @@ async def execute_etl_endpoint(
 #  Alertas (gerados a partir do uso real)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/alerts", response_model=AlertsResponse)
 async def get_alerts(
     user_id: str = Depends(get_current_user_id),
@@ -239,41 +236,49 @@ async def get_alerts(
     plan_gb = total_bytes // _GB
 
     if usage_percent >= 85:
-        alerts.append(SystemAlert(
-            id="alert-storage-critical",
-            title=f"Storage Crítico: {usage_percent:.1f}%",
-            subtitle=f"Ação imediata — banco próximo do limite de {plan_gb}GB (Render)",
-            level="critical",
-            triggered_at=now,
-        ))
+        alerts.append(
+            SystemAlert(
+                id="alert-storage-critical",
+                title=f"Storage Crítico: {usage_percent:.1f}%",
+                subtitle=f"Ação imediata — banco próximo do limite de {plan_gb}GB (Render)",
+                level="critical",
+                triggered_at=now,
+            )
+        )
     elif usage_percent >= 70:
-        alerts.append(SystemAlert(
-            id="alert-storage-warning",
-            title=f"Storage > 70%: {usage_percent:.1f}%",
-            subtitle=f"Considere fazer upgrade do plano Render ({plan_gb}GB atual)",
-            level="warning",
-            triggered_at=now,
-        ))
+        alerts.append(
+            SystemAlert(
+                id="alert-storage-warning",
+                title=f"Storage > 70%: {usage_percent:.1f}%",
+                subtitle=f"Considere fazer upgrade do plano Render ({plan_gb}GB atual)",
+                level="warning",
+                triggered_at=now,
+            )
+        )
     else:
-        alerts.append(SystemAlert(
-            id="alert-storage-ok",
-            title="Storage em níveis normais",
-            subtitle=f"{usage_percent:.1f}% utilizado — plano {plan_gb}GB (Render)",
-            level="info",
-            triggered_at=now,
-        ))
+        alerts.append(
+            SystemAlert(
+                id="alert-storage-ok",
+                title="Storage em níveis normais",
+                subtitle=f"{usage_percent:.1f}% utilizado — plano {plan_gb}GB (Render)",
+                level="info",
+                triggered_at=now,
+            )
+        )
 
     # Alerta de ETL — verifica última execução
     runs = get_etl_runs()
     if runs:
         last_run = runs[-1]
         if last_run.get("status") == "failed":
-            alerts.append(SystemAlert(
-                id="alert-etl-failed",
-                title="Falha no último ETL",
-                subtitle=last_run.get("error") or "Erro desconhecido no scraping",
-                level="error",
-                triggered_at=last_run.get("started_at", now),
-            ))
+            alerts.append(
+                SystemAlert(
+                    id="alert-etl-failed",
+                    title="Falha no último ETL",
+                    subtitle=last_run.get("error") or "Erro desconhecido no scraping",
+                    level="error",
+                    triggered_at=last_run.get("started_at", now),
+                )
+            )
 
     return AlertsResponse(alerts=alerts)

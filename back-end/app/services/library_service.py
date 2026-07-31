@@ -9,6 +9,7 @@ from app.domain.library.schemas import (
     LibraryItem,
     LibraryResponse,
 )
+from app.models.library import Favorite, ReadingHistory
 from app.repositories.library_repository import LibraryRepository
 from app.repositories.post_repository import PostRepository
 
@@ -29,6 +30,7 @@ class LibraryService:
         """Retorna favoritos ou histórico do usuário com filtros opcionais."""
         uid = uuid.UUID(user_id)
 
+        records: list[Favorite] | list[ReadingHistory]
         if tab == "favorites":
             records = await self.repo.list_favorites(uid, query=query, tag=tag)
         else:
@@ -53,9 +55,7 @@ class LibraryService:
             message="Post adicionado aos favoritos.",
         )
 
-    async def remove_favorite(
-        self, user_id: str, post_id: str
-    ) -> FavoriteToggleResponse:
+    async def remove_favorite(self, user_id: str, post_id: str) -> FavoriteToggleResponse:
         """Remove post dos favoritos."""
         uid = uuid.UUID(user_id)
         pid = uuid.UUID(post_id)

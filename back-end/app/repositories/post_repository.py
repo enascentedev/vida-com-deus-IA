@@ -31,9 +31,7 @@ class PostRepository:
 
         return posts[0], posts[1:5]
 
-    async def list_posts(
-        self, query: str | None = None, tag: str | None = None
-    ) -> list[Post]:
+    async def list_posts(self, query: str | None = None, tag: str | None = None) -> list[Post]:
         """Lista posts com busca por título (ILIKE) ou filtro por tag."""
         stmt = select(Post).options(selectinload(Post.tags))
 
@@ -41,11 +39,7 @@ class PostRepository:
             stmt = stmt.where(Post.title.ilike(f"%{query}%"))
 
         if tag:
-            stmt = stmt.where(
-                Post.id.in_(
-                    select(PostTag.post_id).where(PostTag.name == tag)
-                )
-            )
+            stmt = stmt.where(Post.id.in_(select(PostTag.post_id).where(PostTag.name == tag)))
 
         stmt = stmt.order_by(Post.date.desc().nullslast(), Post.created_at.desc())
         result = await self.db.execute(stmt)
@@ -53,21 +47,13 @@ class PostRepository:
 
     async def get_by_id(self, post_id: uuid.UUID) -> Post | None:
         """Busca post por ID com eager load das tags."""
-        stmt = (
-            select(Post)
-            .options(selectinload(Post.tags))
-            .where(Post.id == post_id)
-        )
+        stmt = select(Post).options(selectinload(Post.tags)).where(Post.id == post_id)
         result = await self.db.execute(stmt)
         return result.scalars().first()
 
     async def get_by_source_url(self, source_url: str) -> Post | None:
         """Busca post pela URL de origem (usada no upsert do ETL)."""
-        stmt = (
-            select(Post)
-            .options(selectinload(Post.tags))
-            .where(Post.source_url == source_url)
-        )
+        stmt = select(Post).options(selectinload(Post.tags)).where(Post.source_url == source_url)
         result = await self.db.execute(stmt)
         return result.scalars().first()
 

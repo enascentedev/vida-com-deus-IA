@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Text
+from sqlalchemy import ForeignKey, Index, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -27,8 +27,14 @@ class ChatMessage(BaseModel):
 
     __tablename__ = "chat_messages"
 
+    # O histórico é sempre lido por conversa e em ordem cronológica; o índice
+    # composto atende a consulta inteira e torna o índice simples redundante.
+    __table_args__ = (
+        Index("ix_chat_messages_conversation_id_created_at", "conversation_id", "created_at"),
+    )
+
     conversation_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("chat_conversations.id", ondelete="CASCADE"), index=True
+        ForeignKey("chat_conversations.id", ondelete="CASCADE")
     )
     role: Mapped[str]  # "user" | "assistant"
     content: Mapped[str] = mapped_column(Text)
@@ -47,7 +53,7 @@ class ChatCitation(BaseModel):
     message_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("chat_messages.id", ondelete="CASCADE"), index=True
     )
-    reference: Mapped[str]   # ex: "João 3:16"
+    reference: Mapped[str]  # ex: "João 3:16"
     book: Mapped[str | None]
     chapter: Mapped[int | None]
     verse: Mapped[str | None]

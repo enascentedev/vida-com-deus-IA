@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -85,7 +85,7 @@ class ChatRepository:
             .where(ChatConversation.id == conversation_id)
             .values(
                 message_count=ChatConversation.message_count + 1,
-                updated_at=datetime.now(timezone.utc),
+                updated_at=datetime.now(UTC),
                 **({"last_message_preview": preview} if preview else {}),
             )
         )
@@ -94,8 +94,10 @@ class ChatRepository:
 
         # Recarrega com citações
         await self.db.refresh(msg)
-        stmt_cit = select(ChatMessage).where(ChatMessage.id == msg.id).options(
-            selectinload(ChatMessage.citations)
+        stmt_cit = (
+            select(ChatMessage)
+            .where(ChatMessage.id == msg.id)
+            .options(selectinload(ChatMessage.citations))
         )
         result = await self.db.execute(stmt_cit)
         return result.scalar_one()

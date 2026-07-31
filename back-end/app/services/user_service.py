@@ -9,6 +9,8 @@ from app.domain.users.schemas import (
     UpdateProfileRequest,
     UpdateSettingsRequest,
     UserProfile,
+)
+from app.domain.users.schemas import (
     UserSettings as UserSettingsSchema,
 )
 from app.repositories.user_repository import UserRepository
@@ -33,9 +35,7 @@ async def get_me(db: AsyncSession, user_id: str) -> UserProfile:
     )
 
 
-async def update_me(
-    db: AsyncSession, user_id: str, data: UpdateProfileRequest
-) -> UserProfile:
+async def update_me(db: AsyncSession, user_id: str, data: UpdateProfileRequest) -> UserProfile:
     """Atualiza campos permitidos do perfil."""
     repo = UserRepository(db)
     user = await repo.get_by_id(uuid.UUID(user_id))
