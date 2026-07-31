@@ -362,8 +362,15 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify({ name, email, password }),
     }),
-  logout: () =>
-    apiFetch<MessageResponse>("/auth/logout", { method: "POST" }),
+  // O refresh token vai no corpo para que o servidor revogue a sessão — sem ele
+  // o logout apagaria o token só no cliente, e a sessão continuaria válida.
+  logout: (refreshToken?: string) =>
+    apiFetch<MessageResponse>("/auth/logout", {
+      method: "POST",
+      body: JSON.stringify({ refresh_token: refreshToken ?? null }),
+    }),
+  logoutAll: () =>
+    apiFetch<MessageResponse>("/auth/logout-all", { method: "POST" }),
   forgotPassword: (email: string) =>
     apiFetch<MessageResponse>("/auth/forgot-password", {
       method: "POST",

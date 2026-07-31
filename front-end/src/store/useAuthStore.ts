@@ -56,9 +56,10 @@ export const useAuthStore = create<AuthState>()((set) => ({
     set({ isAuthenticated: true, user })
   },
 
-  // Encerra sessão
+  // Encerra sessão — envia o refresh token para que o servidor a revogue
   logout: async () => {
-    await authApi.logout().catch(() => {}) // fire-and-forget
+    const refresh = localStorage.getItem(REFRESH_KEY) ?? undefined
+    await authApi.logout(refresh).catch(() => {}) // limpa o cliente mesmo se falhar
     localStorage.removeItem(ACCESS_KEY)
     localStorage.removeItem(REFRESH_KEY)
     set({ isAuthenticated: false, user: null })
