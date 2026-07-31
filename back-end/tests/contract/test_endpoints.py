@@ -11,11 +11,13 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.dependencies import get_current_user_id
 from app.core.database import get_db
+from app.core.dependencies import get_current_user_id
 from app.domain.auth.schemas import MessageResponse, TokenPair
 from app.domain.chat.schemas import (
     ChatMessage as ChatMessageSchema,
+)
+from app.domain.chat.schemas import (
     Conversation,
     ConversationListResponse,
     MessagesResponse,
@@ -33,12 +35,20 @@ from app.main import app
 
 FAKE_USER_ID = str(uuid.uuid4())
 
-# Sobrescreve a dependência de autenticação para os testes de contrato
-app.dependency_overrides[get_current_user_id] = lambda: FAKE_USER_ID
 
-# Mock de sessão do banco — endpoints que usam get_db diretamente (auth)
-_mock_db = AsyncMock()
-app.dependency_overrides[get_db] = lambda: _mock_db
+@pytest.fixture(autouse=True)
+def _contract_overrides():
+    """Substitui autenticação e banco apenas durante os testes deste módulo.
+
+    O override é desfeito no teardown — sem isso ele vazaria para os testes de
+    integração, que precisam do banco e da autenticação reais.
+    """
+    app.dependency_overrides[get_current_user_id] = lambda: FAKE_USER_ID
+    app.dependency_overrides[get_db] = lambda: AsyncMock()
+    yield
+    app.dependency_overrides.pop(get_current_user_id, None)
+    app.dependency_overrides.pop(get_db, None)
+
 
 client = TestClient(app)
 AUTH_HEADER = {"Authorization": "Bearer token-de-teste"}
@@ -94,6 +104,7 @@ _FAKE_SEND_RESPONSE = SendMessageResponse(
 
 # ─── Health ──────────────────────────────────────────────────────────────────
 
+
 def test_health():
     r = client.get("/health")
     assert r.status_code == 200
@@ -104,13 +115,17 @@ def test_health():
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
 
+
 @patch("app.api.v1.auth.auth_service.signup", new_callable=AsyncMock, return_value=_FAKE_TOKEN_PAIR)
 def test_signup(mock_signup):
-    r = client.post("/v1/auth/signup", json={
-        "name": "João Silva",
-        "email": "joao@exemplo.com",
-        "password": "senha123",
-    })
+    r = client.post(
+        "/v1/auth/signup",
+        json={
+            "name": "João Silva",
+            "email": "joao@exemplo.com",
+            "password": "senha123",
+        },
+    )
     assert r.status_code == 201
     body = r.json()
     assert "access_token" in body
@@ -120,17 +135,22 @@ def test_signup(mock_signup):
 
 @patch("app.api.v1.auth.auth_service.login", new_callable=AsyncMock, return_value=_FAKE_TOKEN_PAIR)
 def test_login(mock_login):
-    r = client.post("/v1/auth/login", json={
-        "email": "joao@exemplo.com",
-        "password": "senha123",
-    })
+    r = client.post(
+        "/v1/auth/login",
+        json={
+            "email": "joao@exemplo.com",
+            "password": "senha123",
+        },
+    )
     assert r.status_code == 200
     body = r.json()
     assert "access_token" in body
     assert "refresh_token" in body
 
 
-@patch("app.api.v1.auth.auth_service.refresh", new_callable=AsyncMock, return_value=_FAKE_TOKEN_PAIR)
+@patch(
+    "app.api.v1.auth.auth_service.refresh", new_callable=AsyncMock, return_value=_FAKE_TOKEN_PAIR
+)
 def test_refresh(mock_refresh):
     r = client.post("/v1/auth/refresh", json={"refresh_token": "any-token"})
     assert r.status_code == 200
@@ -146,10 +166,13 @@ def test_forgot_password(mock_forgot):
 
 @patch("app.api.v1.auth.auth_service.reset_password", new_callable=AsyncMock, return_value=None)
 def test_reset_password(mock_reset):
-    r = client.post("/v1/auth/reset-password", json={
-        "token": "reset-token-123",
-        "new_password": "nova-senha-456",
-    })
+    r = client.post(
+        "/v1/auth/reset-password",
+        json={
+            "token": "reset-token-123",
+            "new_password": "nova-senha-456",
+        },
+    )
     assert r.status_code == 200
     assert "message" in r.json()
 
@@ -163,11 +186,14 @@ def test_logout(mock_logout):
 
 # ─── Users ───────────────────────────────────────────────────────────────────
 
+
 @patch("app.api.v1.users.user_service.get_me", new_callable=AsyncMock)
 def test_get_me(mock_get_me):
     mock_get_me.return_value = {
-        "id": FAKE_USER_ID, "name": "Gabriel Santos",
-        "email": "gabriel@vidacomdeus.com", "plan": "free",
+        "id": FAKE_USER_ID,
+        "name": "Gabriel Santos",
+        "email": "gabriel@vidacomdeus.com",
+        "plan": "free",
     }
     r = client.get("/v1/users/me", headers=AUTH_HEADER)
     assert r.status_code == 200
@@ -180,8 +206,10 @@ def test_get_me(mock_get_me):
 @patch("app.api.v1.users.user_service.update_me", new_callable=AsyncMock)
 def test_update_me(mock_update):
     mock_update.return_value = {
-        "id": FAKE_USER_ID, "name": "Gabriel S.",
-        "email": "gabriel@vidacomdeus.com", "plan": "free",
+        "id": FAKE_USER_ID,
+        "name": "Gabriel S.",
+        "email": "gabriel@vidacomdeus.com",
+        "plan": "free",
     }
     r = client.patch("/v1/users/me", json={"name": "Gabriel S."}, headers=AUTH_HEADER)
     assert r.status_code == 200
@@ -191,8 +219,10 @@ def test_update_me(mock_update):
 @patch("app.api.v1.users.user_service.get_settings", new_callable=AsyncMock)
 def test_get_settings(mock_settings):
     mock_settings.return_value = {
-        "theme": "system", "ai_insights": True,
-        "biblical_reminders": True, "rag_memory": False,
+        "theme": "system",
+        "ai_insights": True,
+        "biblical_reminders": True,
+        "rag_memory": False,
     }
     r = client.get("/v1/users/me/settings", headers=AUTH_HEADER)
     assert r.status_code == 200
@@ -206,8 +236,10 @@ def test_get_settings(mock_settings):
 @patch("app.api.v1.users.user_service.update_settings", new_callable=AsyncMock)
 def test_update_settings(mock_update):
     mock_update.return_value = {
-        "theme": "dark", "ai_insights": True,
-        "biblical_reminders": True, "rag_memory": False,
+        "theme": "dark",
+        "ai_insights": True,
+        "biblical_reminders": True,
+        "rag_memory": False,
     }
     r = client.patch("/v1/users/me/settings", json={"theme": "dark"}, headers=AUTH_HEADER)
     assert r.status_code == 200
@@ -258,7 +290,11 @@ _FAKE_AUDIO = AudioResponse(
 )
 
 
-@patch("app.services.post_service.PostService.get_feed", new_callable=AsyncMock, return_value=_FAKE_FEED)
+@patch(
+    "app.services.post_service.PostService.get_feed",
+    new_callable=AsyncMock,
+    return_value=_FAKE_FEED,
+)
 def test_get_feed(mock_feed):
     r = client.get("/v1/posts/feed", headers=AUTH_HEADER)
     assert r.status_code == 200
@@ -268,14 +304,22 @@ def test_get_feed(mock_feed):
     assert isinstance(body["recent_posts"], list)
 
 
-@patch("app.services.post_service.PostService.list_posts", new_callable=AsyncMock, return_value=[_FAKE_POST_SUMMARY])
+@patch(
+    "app.services.post_service.PostService.list_posts",
+    new_callable=AsyncMock,
+    return_value=[_FAKE_POST_SUMMARY],
+)
 def test_list_posts(mock_list):
     r = client.get("/v1/posts", headers=AUTH_HEADER)
     assert r.status_code == 200
     assert isinstance(r.json(), list)
 
 
-@patch("app.services.post_service.PostService.list_posts", new_callable=AsyncMock, return_value=[_FAKE_POST_SUMMARY])
+@patch(
+    "app.services.post_service.PostService.list_posts",
+    new_callable=AsyncMock,
+    return_value=[_FAKE_POST_SUMMARY],
+)
 def test_list_posts_with_query(mock_list):
     r = client.get("/v1/posts?query=Paz", headers=AUTH_HEADER)
     assert r.status_code == 200
@@ -283,7 +327,11 @@ def test_list_posts_with_query(mock_list):
     assert all("Paz" in p["title"] or "paz" in p["title"].lower() for p in results)
 
 
-@patch("app.services.post_service.PostService.get_post_detail", new_callable=AsyncMock, return_value=_FAKE_POST_DETAIL)
+@patch(
+    "app.services.post_service.PostService.get_post_detail",
+    new_callable=AsyncMock,
+    return_value=_FAKE_POST_DETAIL,
+)
 def test_get_post_detail(mock_detail):
     r = client.get(f"/v1/posts/{_FAKE_POST_ID}", headers=AUTH_HEADER)
     assert r.status_code == 200
@@ -295,7 +343,11 @@ def test_get_post_detail(mock_detail):
     assert isinstance(body["key_points"], list)
 
 
-@patch("app.services.post_service.PostService.get_post_audio", new_callable=AsyncMock, return_value=_FAKE_AUDIO)
+@patch(
+    "app.services.post_service.PostService.get_post_audio",
+    new_callable=AsyncMock,
+    return_value=_FAKE_AUDIO,
+)
 def test_get_post_audio(mock_audio):
     r = client.get(f"/v1/posts/{_FAKE_POST_ID}/audio", headers=AUTH_HEADER)
     assert r.status_code == 200
@@ -306,7 +358,12 @@ def test_get_post_audio(mock_audio):
 
 # ─── Library ─────────────────────────────────────────────────────────────────
 
-@patch("app.services.library_service.LibraryService.get_library", new_callable=AsyncMock, return_value=_FAKE_LIBRARY_EMPTY)
+
+@patch(
+    "app.services.library_service.LibraryService.get_library",
+    new_callable=AsyncMock,
+    return_value=_FAKE_LIBRARY_EMPTY,
+)
 def test_get_favorites(mock_get):
     r = client.get("/v1/library?tab=favorites", headers=AUTH_HEADER)
     assert r.status_code == 200
@@ -316,14 +373,22 @@ def test_get_favorites(mock_get):
     assert isinstance(body["items"], list)
 
 
-@patch("app.services.library_service.LibraryService.get_library", new_callable=AsyncMock, return_value=_FAKE_LIBRARY_EMPTY)
+@patch(
+    "app.services.library_service.LibraryService.get_library",
+    new_callable=AsyncMock,
+    return_value=_FAKE_LIBRARY_EMPTY,
+)
 def test_get_history(mock_get):
     r = client.get("/v1/library?tab=history", headers=AUTH_HEADER)
     assert r.status_code == 200
     assert isinstance(r.json()["items"], list)
 
 
-@patch("app.services.library_service.LibraryService.add_favorite", new_callable=AsyncMock, return_value=_FAKE_FAV_ADDED)
+@patch(
+    "app.services.library_service.LibraryService.add_favorite",
+    new_callable=AsyncMock,
+    return_value=_FAKE_FAV_ADDED,
+)
 def test_add_favorite(mock_add):
     r = client.post("/v1/library/favorites/post-001", headers=AUTH_HEADER)
     assert r.status_code == 201
@@ -332,7 +397,11 @@ def test_add_favorite(mock_add):
     assert body["post_id"] == "post-001"
 
 
-@patch("app.services.library_service.LibraryService.remove_favorite", new_callable=AsyncMock, return_value=_FAKE_FAV_REMOVED)
+@patch(
+    "app.services.library_service.LibraryService.remove_favorite",
+    new_callable=AsyncMock,
+    return_value=_FAKE_FAV_REMOVED,
+)
 def test_remove_favorite(mock_remove):
     r = client.delete("/v1/library/favorites/post-001", headers=AUTH_HEADER)
     assert r.status_code == 200
@@ -340,7 +409,11 @@ def test_remove_favorite(mock_remove):
     assert body["is_favorited"] is False
 
 
-@patch("app.services.library_service.LibraryService.record_history", new_callable=AsyncMock, return_value=_FAKE_HISTORY_MSG)
+@patch(
+    "app.services.library_service.LibraryService.record_history",
+    new_callable=AsyncMock,
+    return_value=_FAKE_HISTORY_MSG,
+)
 def test_record_history(mock_history):
     r = client.post("/v1/library/history", json={"post_id": "post-001"}, headers=AUTH_HEADER)
     assert r.status_code == 201
@@ -349,7 +422,12 @@ def test_record_history(mock_history):
 
 # ─── Chat ─────────────────────────────────────────────────────────────────────
 
-@patch("app.services.chat_service.ChatService.create_conversation", new_callable=AsyncMock, return_value=_FAKE_CONVERSATION)
+
+@patch(
+    "app.services.chat_service.ChatService.create_conversation",
+    new_callable=AsyncMock,
+    return_value=_FAKE_CONVERSATION,
+)
 def test_create_conversation(mock_create):
     r = client.post("/v1/chat/conversations", headers=AUTH_HEADER)
     assert r.status_code == 201
@@ -358,14 +436,22 @@ def test_create_conversation(mock_create):
     assert "user_id" in body
 
 
-@patch("app.services.chat_service.ChatService.list_conversations", new_callable=AsyncMock, return_value=_FAKE_CONV_LIST)
+@patch(
+    "app.services.chat_service.ChatService.list_conversations",
+    new_callable=AsyncMock,
+    return_value=_FAKE_CONV_LIST,
+)
 def test_list_conversations(mock_list):
     r = client.get("/v1/chat/conversations", headers=AUTH_HEADER)
     assert r.status_code == 200
     assert "conversations" in r.json()
 
 
-@patch("app.services.chat_service.ChatService.get_messages", new_callable=AsyncMock, return_value=_FAKE_MESSAGES)
+@patch(
+    "app.services.chat_service.ChatService.get_messages",
+    new_callable=AsyncMock,
+    return_value=_FAKE_MESSAGES,
+)
 def test_get_messages(mock_get):
     r = client.get("/v1/chat/conversations/conv-001/messages", headers=AUTH_HEADER)
     assert r.status_code == 200
@@ -377,7 +463,11 @@ def test_get_messages(mock_get):
     assert msgs[0]["role"] in ("user", "assistant")
 
 
-@patch("app.services.chat_service.ChatService.send_message", new_callable=AsyncMock, return_value=_FAKE_SEND_RESPONSE)
+@patch(
+    "app.services.chat_service.ChatService.send_message",
+    new_callable=AsyncMock,
+    return_value=_FAKE_SEND_RESPONSE,
+)
 def test_send_message(mock_send):
     r = client.post(
         "/v1/chat/conversations/conv-001/messages",
@@ -394,6 +484,7 @@ def test_send_message(mock_send):
 
 
 # ─── Therapist ────────────────────────────────────────────────────────────────
+
 
 def test_therapist_overview():
     r = client.get("/v1/therapist/overview", headers=AUTH_HEADER)
@@ -424,13 +515,17 @@ def test_therapist_list_patients():
 
 
 def test_therapist_create_patient():
-    r = client.post("/v1/therapist/patients", json={
-        "name": "Teste Criação",
-        "email": "teste@email.com",
-        "chief_complaint": "Queixa de teste",
-        "anxiety_level": "mild",
-        "messages_limit": 50,
-    }, headers=AUTH_HEADER)
+    r = client.post(
+        "/v1/therapist/patients",
+        json={
+            "name": "Teste Criação",
+            "email": "teste@email.com",
+            "chief_complaint": "Queixa de teste",
+            "anxiety_level": "mild",
+            "messages_limit": 50,
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 201
     body = r.json()
     assert body["name"] == "Teste Criação"
@@ -442,13 +537,17 @@ def test_therapist_create_patient():
 
 
 def test_therapist_create_patient_with_first_session():
-    r = client.post("/v1/therapist/patients", json={
-        "name": "Com Sessão",
-        "email": "sessao@email.com",
-        "first_session_date": "2025-12-01",
-        "first_session_summary": "Sessão inicial",
-        "first_session_mood": "good",
-    }, headers=AUTH_HEADER)
+    r = client.post(
+        "/v1/therapist/patients",
+        json={
+            "name": "Com Sessão",
+            "email": "sessao@email.com",
+            "first_session_date": "2025-12-01",
+            "first_session_summary": "Sessão inicial",
+            "first_session_mood": "good",
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 201
     body = r.json()
     assert len(body["sessions"]) == 1
@@ -456,17 +555,25 @@ def test_therapist_create_patient_with_first_session():
 
 
 def test_therapist_create_patient_invalid_email():
-    r = client.post("/v1/therapist/patients", json={
-        "name": "Email Inválido",
-        "email": "nao-e-email",
-    }, headers=AUTH_HEADER)
+    r = client.post(
+        "/v1/therapist/patients",
+        json={
+            "name": "Email Inválido",
+            "email": "nao-e-email",
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 422
 
 
 def test_therapist_create_patient_missing_name():
-    r = client.post("/v1/therapist/patients", json={
-        "email": "teste@email.com",
-    }, headers=AUTH_HEADER)
+    r = client.post(
+        "/v1/therapist/patients",
+        json={
+            "email": "teste@email.com",
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 422
 
 
@@ -485,43 +592,67 @@ def test_therapist_get_patient_not_found():
 
 
 def test_therapist_update_patient():
-    r = client.patch("/v1/therapist/patients/pat-001", json={
-        "therapy_goal": "Meta atualizada via teste",
-    }, headers=AUTH_HEADER)
+    r = client.patch(
+        "/v1/therapist/patients/pat-001",
+        json={
+            "therapy_goal": "Meta atualizada via teste",
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 200
     assert r.json()["therapy_goal"] == "Meta atualizada via teste"
 
 
 def test_therapist_update_patient_invalid_anxiety():
-    r = client.patch("/v1/therapist/patients/pat-001", json={
-        "anxiety_level": "inexistente",
-    }, headers=AUTH_HEADER)
+    r = client.patch(
+        "/v1/therapist/patients/pat-001",
+        json={
+            "anxiety_level": "inexistente",
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 422
 
 
 def test_therapist_update_status():
-    r = client.patch("/v1/therapist/patients/pat-001/status", json={
-        "status": "paused",
-    }, headers=AUTH_HEADER)
+    r = client.patch(
+        "/v1/therapist/patients/pat-001/status",
+        json={
+            "status": "paused",
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 200
     assert r.json()["status"] == "paused"
     # Restaurar status
-    client.patch("/v1/therapist/patients/pat-001/status", json={
-        "status": "active",
-    }, headers=AUTH_HEADER)
+    client.patch(
+        "/v1/therapist/patients/pat-001/status",
+        json={
+            "status": "active",
+        },
+        headers=AUTH_HEADER,
+    )
 
 
 def test_therapist_update_status_invalid():
-    r = client.patch("/v1/therapist/patients/pat-001/status", json={
-        "status": "invalido",
-    }, headers=AUTH_HEADER)
+    r = client.patch(
+        "/v1/therapist/patients/pat-001/status",
+        json={
+            "status": "invalido",
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 422
 
 
 def test_therapist_update_limit():
-    r = client.patch("/v1/therapist/patients/pat-001/limit", json={
-        "messages_limit": 250,
-    }, headers=AUTH_HEADER)
+    r = client.patch(
+        "/v1/therapist/patients/pat-001/limit",
+        json={
+            "messages_limit": 250,
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 200
     assert r.json()["messages_limit"] == 250
 
@@ -541,13 +672,17 @@ def test_therapist_list_sessions_not_found():
 
 
 def test_therapist_create_session():
-    r = client.post("/v1/therapist/patients/pat-001/sessions", json={
-        "date": "2025-12-01",
-        "summary": "Sessão de teste",
-        "mood": "great",
-        "topics_covered": ["teste"],
-        "homework": "Tarefa de teste",
-    }, headers=AUTH_HEADER)
+    r = client.post(
+        "/v1/therapist/patients/pat-001/sessions",
+        json={
+            "date": "2025-12-01",
+            "summary": "Sessão de teste",
+            "mood": "great",
+            "topics_covered": ["teste"],
+            "homework": "Tarefa de teste",
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 201
     body = r.json()
     assert body["mood"] == "great"
@@ -556,18 +691,26 @@ def test_therapist_create_session():
 
 
 def test_therapist_create_session_invalid_mood():
-    r = client.post("/v1/therapist/patients/pat-001/sessions", json={
-        "date": "2025-12-01",
-        "summary": "Teste",
-        "mood": "invalido",
-    }, headers=AUTH_HEADER)
+    r = client.post(
+        "/v1/therapist/patients/pat-001/sessions",
+        json={
+            "date": "2025-12-01",
+            "summary": "Teste",
+            "mood": "invalido",
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 422
 
 
 def test_therapist_create_session_missing_fields():
-    r = client.post("/v1/therapist/patients/pat-001/sessions", json={
-        "date": "2025-12-01",
-    }, headers=AUTH_HEADER)
+    r = client.post(
+        "/v1/therapist/patients/pat-001/sessions",
+        json={
+            "date": "2025-12-01",
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 422
 
 
@@ -576,27 +719,57 @@ def test_therapist_update_session():
     sessions_r = client.get("/v1/therapist/patients/pat-001/sessions", headers=AUTH_HEADER)
     session_id = sessions_r.json()["sessions"][0]["id"]
 
-    r = client.patch(f"/v1/therapist/patients/pat-001/sessions/{session_id}", json={
-        "date": "2025-12-15",
-        "summary": "Sessão editada via teste",
-        "mood": "neutral",
-    }, headers=AUTH_HEADER)
+    r = client.patch(
+        f"/v1/therapist/patients/pat-001/sessions/{session_id}",
+        json={
+            "date": "2025-12-15",
+            "summary": "Sessão editada via teste",
+            "mood": "neutral",
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 200
     assert r.json()["summary"] == "Sessão editada via teste"
 
 
 def test_therapist_update_session_not_found():
-    r = client.patch("/v1/therapist/patients/pat-001/sessions/inexistente", json={
-        "date": "2025-12-15",
-        "summary": "Não existe",
-        "mood": "neutral",
-    }, headers=AUTH_HEADER)
+    r = client.patch(
+        "/v1/therapist/patients/pat-001/sessions/inexistente",
+        json={
+            "date": "2025-12-15",
+            "summary": "Não existe",
+            "mood": "neutral",
+        },
+        headers=AUTH_HEADER,
+    )
     assert r.status_code == 404
 
 
 # ─── Admin ───────────────────────────────────────────────────────────────────
+# Os endpoints de métricas executam SQL direto (pg_database_size, snapshots);
+# no teste de contrato o resultado é simulado com um mock configurado por rota.
+
+
+def _override_db_execute(*results):
+    """Injeta um banco falso cujo execute devolve os resultados na ordem dada."""
+    from unittest.mock import MagicMock
+
+    db = AsyncMock()
+    db.execute = AsyncMock(side_effect=[*results, MagicMock()])
+    app.dependency_overrides[get_db] = lambda: db
+    return db
+
+
+def _scalar_result(value):
+    from unittest.mock import MagicMock
+
+    result = MagicMock()
+    result.scalar_one.return_value = value
+    return result
+
 
 def test_get_storage_metrics():
+    _override_db_execute(_scalar_result(200_000_000))
     r = client.get("/v1/admin/metrics/storage", headers=AUTH_HEADER)
     assert r.status_code == 200
     body = r.json()
@@ -606,6 +779,17 @@ def test_get_storage_metrics():
 
 
 def test_get_growth_metrics():
+    from datetime import date, timedelta
+    from unittest.mock import MagicMock
+
+    rows = [
+        {"day": date(2026, 7, 30) - timedelta(days=i), "used_bytes": 200_000_000 - i * 1_000}
+        for i in range(7)
+    ]
+    result = MagicMock()
+    result.mappings.return_value.fetchall.return_value = rows
+    _override_db_execute(result)
+
     r = client.get("/v1/admin/metrics/growth", headers=AUTH_HEADER)
     assert r.status_code == 200
     body = r.json()
@@ -624,14 +808,18 @@ def test_get_etl_runs():
     assert run["status"] in ("success", "failed", "running", "pending")
 
 
-@patch("app.api.v1.admin.run_etl", new_callable=AsyncMock, return_value={
-    "status": "success",
-    "started_at": "2026-02-21T00:00:00Z",
-    "finished_at": "2026-02-21T00:00:05Z",
-    "posts_collected": 5,
-    "new_posts": 3,
-    "message": "5 reflexões coletadas (3 novas)",
-})
+@patch(
+    "app.api.v1.admin.run_etl",
+    new_callable=AsyncMock,
+    return_value={
+        "status": "success",
+        "started_at": "2026-02-21T00:00:00Z",
+        "finished_at": "2026-02-21T00:00:05Z",
+        "posts_collected": 5,
+        "new_posts": 3,
+        "message": "5 reflexões coletadas (3 novas)",
+    },
+)
 def test_execute_etl(mock_etl):
     r = client.post("/v1/admin/etl/runs/execute", headers=AUTH_HEADER)
     assert r.status_code == 202
@@ -641,6 +829,7 @@ def test_execute_etl(mock_etl):
 
 
 def test_get_alerts():
+    _override_db_execute(_scalar_result(200_000_000))
     r = client.get("/v1/admin/alerts", headers=AUTH_HEADER)
     assert r.status_code == 200
     body = r.json()
