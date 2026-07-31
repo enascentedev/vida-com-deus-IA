@@ -1,0 +1,33 @@
+# Ambiente — nunca versionar segredos
+.env
+.env.*
+!.env.example
+
+# Dependências
+node_modules/
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Testes e cobertura
+.pytest_cache/
+.coverage
+coverage/
+htmlcov/
+
+# Dados sensíveis — ver back-end/data/README.md
+back-end/data/patients.json
+
+# Sistema operacional e editores
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
