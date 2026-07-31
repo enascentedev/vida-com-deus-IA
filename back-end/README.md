@@ -13,7 +13,20 @@
 
 Backend da aplicação **Vida com Deus**, construído como um monolito modular com FastAPI. A arquitetura é orientada a domínios — cada domínio de produto (autenticação, posts, chat, biblioteca, admin) vive em seu próprio router, schema e camada de serviço, permitindo evolução independente.
 
-**Estado atual — Fase 1:** todos os endpoints estão implementados e documentados, retornando dados mockados. A integração com banco de dados (PostgreSQL) e cache (Redis) está planejada para a Fase 2.
+**Estado atual — Fase 2:** autenticação e persistência reais sobre PostgreSQL (SQLAlchemy 2 async + Alembic). Estado por categoria:
+
+| Funcionalidade | Estado |
+| --- | --- |
+| Cadastro/login com hash Argon2 e sessões no banco | **Implementado** |
+| Access/refresh tokens tipados, rotação, revogação e detecção de reuso | **Implementado** |
+| Conversas e mensagens do chat persistidas, isoladas por usuário | **Implementado** |
+| Perfil e configurações de usuário no banco | **Implementado** |
+| Posts, biblioteca e métricas admin no banco | **Implementado** |
+| Recuperação de senha | **Parcial** — token é criado, mas não há envio de email |
+| Chat com IA (GPT-4o-mini) | **Implementado** — sem `OPENAI_API_KEY`: stub declarado em dev, 503 em produção |
+| Citações extraídas da resposta real da IA | **Planejado** |
+| Painel therapist | **Simulado** — persiste em JSON local (`data/patients.json`) |
+| Redis / workers assíncronos | **Planejado** (Fase 3) |
 
 ---
 
@@ -24,13 +37,15 @@ Backend da aplicação **Vida com Deus**, construído como um monolito modular c
 | Framework | FastAPI 0.115 (async-first, OpenAPI automático) |
 | Servidor ASGI | Uvicorn (standard) |
 | Validação | Pydantic v2 + pydantic-settings |
-| Autenticação | JWT — python-jose[cryptography] |
+| Banco de dados | PostgreSQL — SQLAlchemy 2 (async) + psycopg 3 |
+| Migrations | Alembic |
+| Autenticação | JWT (python-jose) + Argon2 (passlib) |
 | HTTP Client | httpx |
 | Testes | pytest + pytest-asyncio + pytest-cov |
+| Qualidade | Ruff (lint) + Black (formato) + mypy (tipos) |
 | Gerenciador de pacotes | uv |
 | Python | 3.13 |
-| Banco de dados | PostgreSQL (Fase 2) |
-| Cache | Redis (Fase 2) |
+| Cache | Redis (Fase 3 — ainda não utilizado) |
 
 ---
 
@@ -42,35 +57,25 @@ back-end/
 │   ├── main.py              # FastAPI app — CORS, routers, health check
 │   ├── api/
 │   │   ├── router.py        # Agrega todos os routers sob /v1
-│   │   └── v1/
-│   │       ├── auth.py      # Cadastro, login, refresh, logout, senha
-│   │       ├── users.py     # Perfil e configurações do usuário
-│   │       ├── posts.py     # Feed, detalhe de post, áudio
-│   │       ├── library.py   # Favoritos e histórico
-│   │       ├── chat.py      # Conversas e mensagens com IA
-│   │       └── admin.py     # Métricas, ETL e alertas
+│   │   └── v1/              # Routers finos: validam entrada e delegam aos serviços
 │   ├── core/
-│   │   ├── config.py        # Pydantic Settings — lê variáveis do .env
-│   │   ├── security.py      # Geração e validação de tokens JWT
-│   │   └── dependencies.py  # Dependências FastAPI (Depends)
-│   └── domain/
-│       ├── auth/schemas.py
-│       ├── users/schemas.py
-│       ├── posts/schemas.py
-│       ├── library/schemas.py
-│       ├── chat/schemas.py
-│       └── admin/schemas.py
+│   │   ├── config.py        # Settings validadas na inicialização (segredo forte obrigatório)
+│   │   ├── config_check.py  # `python -m app.core.config_check` — passo de CI
+│   │   ├── security.py      # JWT tipado (access/refresh) com claim de sessão
+│   │   ├── dependencies.py  # get_current_user — valida token e usuário ativo no banco
+│   │   └── database.py      # Engine async + injeção de sessão (get_db)
+│   ├── domain/              # Schemas Pydantic por domínio (contratos da API)
+│   ├── models/              # SQLAlchemy: users, refresh_tokens (sessões), chat, posts...
+│   ├── repositories/        # Acesso a dados
+│   ├── services/            # Regras de negócio (auth_service, chat_service...)
+│   └── integrations/
+│       └── openai_client.py # Assistente bíblico: implementação real + stub declarado
+├── migrations/              # Alembic — criam o banco do zero, com downgrade
 └── tests/
-    └── contract/
-        └── test_endpoints.py  # 40+ casos de teste de contrato
+    ├── unit/                # JWT, config, schemas — sem banco nem rede
+    ├── integration/         # Auth, tokens, autorização e chat contra PostgreSQL real
+    └── contract/            # Status HTTP e formato de resposta (serviços mockados)
 ```
-
-**Camadas planejadas para Fase 2:**
-
-- `app/services/` — lógica de negócio
-- `app/repositories/` — acesso a dados (PostgreSQL via SQLAlchemy)
-- `app/workers/` — tarefas assíncronas (e-mail, ETL)
-- `app/integrations/` — provedores externos (IA, armazenamento)
 
 ---
 
@@ -86,12 +91,21 @@ back-end/
 
 | Método | Rota | Descrição |
 | ------ | ---- | --------- |
-| `POST` | `/signup` | Criar conta |
-| `POST` | `/login` | Login com e-mail e senha |
-| `POST` | `/refresh` | Renovar par de tokens |
-| `POST` | `/logout` | Encerrar sessão |
-| `POST` | `/forgot-password` | Iniciar recuperação de senha |
-| `POST` | `/reset-password` | Concluir redefinição de senha |
+| `POST` | `/signup` | Criar conta (senha ≥ 8 caracteres; email normalizado) |
+| `POST` | `/login` | Login com e-mail e senha — abre uma sessão |
+| `POST` | `/refresh` | Rotaciona o par de tokens (o refresh anterior é revogado) |
+| `POST` | `/logout` | Revoga a sessão (refresh token no body ou access token no header) |
+| `POST` | `/logout-all` | Revoga todas as sessões do usuário autenticado |
+| `POST` | `/forgot-password` | Iniciar recuperação de senha (**parcial** — sem envio de email) |
+| `POST` | `/reset-password` | Concluir redefinição de senha (revoga todas as sessões) |
+
+#### Fluxo de autenticação
+
+1. `signup`/`login` devolvem `{access_token, refresh_token}`. O access token expira em 15 min e só ele é aceito nas rotas protegidas (`Authorization: Bearer ...`).
+2. Quando o access expira, o cliente chama `refresh` com o refresh token. O servidor **rotaciona**: emite um par novo e revoga o refresh usado.
+3. Reapresentar um refresh já revogado é tratado como reuso — **a sessão inteira é derrubada**.
+4. `logout` revoga a sessão no servidor; apagar o token no cliente não basta.
+5. No banco ficam apenas hashes SHA-256 dos refresh tokens — nunca o token puro. Senhas são armazenadas somente como hash Argon2.
 
 ### Usuário — `/v1/users`
 
@@ -162,6 +176,7 @@ back-end/
 
 - Python 3.13
 - [uv](https://docs.astral.sh/uv/) — `pip install uv`
+- PostgreSQL 14+ em execução
 
 ### Passos
 
@@ -169,12 +184,33 @@ back-end/
 # Instalar dependências e criar .venv
 uv sync
 
+# Criar os bancos (desenvolvimento e testes)
+createdb vida_com_deus
+createdb vida_com_deus_test
+
 # Configurar variáveis de ambiente
 cp .env.example .env
-# Edite .env com seus valores (especialmente JWT_SECRET_KEY)
+# Preencha JWT_SECRET_KEY (obrigatório — gere com o comando abaixo) e DATABASE_URL
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+
+# Conferir a configuração (o mesmo passo roda no CI)
+uv run python -m app.core.config_check
+
+# Aplicar as migrations (criam o banco do zero)
+uv run alembic upgrade head
 
 # Iniciar servidor de desenvolvimento (uv run ativa o .venv automaticamente)
 uv run uvicorn app.main:app --reload
+```
+
+A aplicação **não sobe** com `JWT_SECRET_KEY` ausente, curto ou com valor de exemplo — isso é intencional.
+
+### Migrations
+
+```bash
+uv run alembic upgrade head        # aplica tudo
+uv run alembic downgrade -1        # desfaz a última
+uv run alembic revision --autogenerate -m "descricao"   # nova migration
 ```
 
 A API estará disponível em:
@@ -187,14 +223,29 @@ A API estará disponível em:
 
 ## 🧪 Testes
 
+A suíte tem três camadas:
+
+- `tests/unit` — JWT, validação de configuração e schemas. Sem banco, sem rede.
+- `tests/integration` — cadastro, login, ciclo de vida de tokens, autorização e persistência do chat contra um **PostgreSQL real**. Exigem `TEST_DATABASE_URL` apontando para um banco isolado (as tabelas são truncadas entre os testes — nunca use o banco de desenvolvimento).
+- `tests/contract` — status HTTP e formato de resposta, com serviços mockados.
+
 ```bash
-pytest                    # Todos os testes
-pytest tests/contract     # Testes de contrato da API
-pytest --cov              # Com relatório de cobertura
-pytest -v                 # Modo verboso
+uv run pytest                     # tudo (testes de banco são pulados sem TEST_DATABASE_URL)
+uv run pytest tests/unit          # só unitários
+TEST_DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/vida_com_deus_test \
+  uv run pytest tests/integration # integração contra banco real
+uv run pytest --cov               # com cobertura
 ```
 
-Os testes de contrato (Fase 1) validam status HTTP e schemas de resposta para todos os endpoints usando `TestClient` do FastAPI — sem dependência de banco de dados.
+Sem `TEST_DATABASE_URL`, os testes de integração são **pulados com motivo explícito** — nunca silenciosamente. No CI, `REQUIRE_DB=1` transforma esse pulo em falha: a suíte só passa tendo tocado o banco.
+
+Qualidade de código:
+
+```bash
+uv run ruff check .       # lint
+uv run black --check .    # formato (sem modificar)
+uv run mypy app           # tipos — estrito nos módulos de autenticação
+```
 
 ---
 
@@ -204,14 +255,19 @@ Os testes de contrato (Fase 1) validam status HTTP e schemas de resposta para to
 | -------- | ------ | --------- |
 | `APP_NAME` | `Vida com Deus API` | Nome da aplicação |
 | `DEBUG` | `false` | Modo de depuração |
-| `ENVIRONMENT` | `development` | Ambiente atual |
-| `CORS_ORIGINS` | `["http://localhost:5173"]` | Origens permitidas |
-| `JWT_SECRET_KEY` | — | **Obrigatório.** Chave secreta JWT |
-| `JWT_ALGORITHM` | `HS256` | Algoritmo de assinatura JWT |
+| `ENVIRONMENT` | `development` | `development` \| `staging` \| `production` |
+| `CORS_ORIGINS` | `["http://localhost:5173", ...]` | Origens permitidas (lista JSON) |
+| `JWT_SECRET_KEY` | — | **Obrigatório.** ≥ 32 caracteres; valores de exemplo são recusados |
+| `JWT_ALGORITHM` | `HS256` | Permitidos: HS256, HS384, HS512 |
 | `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | `15` | Validade do access token |
 | `JWT_REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Validade do refresh token |
-| `DATABASE_URL` | — | PostgreSQL (Fase 2) |
-| `REDIS_URL` | — | Redis (Fase 2) |
+| `DATABASE_URL` | — | **Obrigatório.** `postgresql+psycopg://user:pass@host:5432/banco` |
+| `TEST_DATABASE_URL` | — | Banco isolado para a suíte de testes |
+| `OPENAI_API_KEY` | — | Chat com IA; sem ela: stub declarado em dev, 503 em produção |
+| `RENDER_DB_SIZE_BYTES` | `1073741824` | Tamanho do plano de banco (métricas admin) |
+| `REDIS_URL` | — | Redis (Fase 3 — ainda não utilizado) |
+
+O CI (`.github/workflows/backend-ci.yml`) sobe um PostgreSQL de serviço, valida a configuração, aplica as migrations em banco limpo (com teste de rollback), roda Ruff, Black, mypy e a suíte completa com `REQUIRE_DB=1` e cobertura mínima de 80% nos módulos de autenticação/autorização.
 
 ---
 

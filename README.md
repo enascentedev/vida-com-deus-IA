@@ -122,11 +122,13 @@ vida-com-deus-IA/
     │   ├── models/                   # Modelos SQLAlchemy 2.0 (User, Post, Favorite, Conversation, etc.)
     │   ├── repositories/             # Repositórios de acesso a dados (user, post, library, chat)
     │   └── services/                 # Lógica de negócio (auth, user, post, library, chat)
-    ├── migrations/                   # Migrações Alembic
-    │   └── versions/                 # 3 migrações: users/auth, posts/tags, library/chat
-    ├── data/                         # Persistência JSON local (Fase 1.5 — fallback)
+    │   └── integrations/             # openai_client.py — assistente real + stub declarado
+    ├── migrations/                   # Migrações Alembic — 6 versões, criam o banco do zero
+    ├── data/                         # JSON local — apenas therapist e histórico de ETL
     └── tests/
-        └── contract/                 # 50+ testes de contrato
+        ├── unit/                     # JWT, configuração e schemas (sem banco)
+        ├── integration/              # Auth, tokens, autorização e chat contra PostgreSQL real
+        └── contract/                 # Status HTTP e formato de resposta
 ```
 
 ---
@@ -155,13 +157,25 @@ vida-com-deus-IA/
 
 ## 🔌 Arquitetura Backend
 
-O backend é uma API FastAPI modular orientada a domínios. A **Fase 1.5** entregou persistência em arquivos JSON locais, ETL real e integração com GPT-4o-mini. A **Fase 2** adicionou modelos SQLAlchemy 2.0, repositórios, serviços e 3 migrações Alembic para PostgreSQL.
+O backend é uma API FastAPI modular orientada a domínios. A **Fase 1.5** entregou persistência em arquivos JSON locais, ETL real e integração com GPT-4o-mini. A **Fase 2** substituiu isso por PostgreSQL: modelos SQLAlchemy 2.0, repositórios, serviços e 6 migrações Alembic, com autenticação real (Argon2, sessões, rotação e revogação de refresh token).
+
+**Estado real por categoria:**
+
+| Funcionalidade | Estado |
+| --- | --- |
+| Cadastro, login e sessões no banco | **Implementado** |
+| Rotação, revogação e detecção de reuso de refresh token | **Implementado** |
+| Posts, biblioteca, chat e métricas admin no PostgreSQL | **Implementado** |
+| Recuperação de senha | **Parcial** — o token é gerado, mas não há envio de email |
+| Chat com IA | **Implementado** — sem `OPENAI_API_KEY`: resposta marcada como simulada em dev, 503 em produção |
+| Painel therapist | **Simulado** — ainda em JSON local |
+| Redis e workers assíncronos | **Planejado** (Fase 3) |
 
 **Endpoints disponíveis em `/v1`:**
 
 | Domínio | Prefixo |
 | ------- | ------- |
-| Auth | `/auth/{signup,login,refresh,logout,forgot-password,reset-password}` |
+| Auth | `/auth/{signup,login,refresh,logout,logout-all,forgot-password,reset-password}` |
 | Usuário | `/users/me`, `/users/me/settings` |
 | Posts | `/posts/feed`, `/posts/{id}`, `/posts/{id}/audio` |
 | Biblioteca | `/library/`, `/library/favorites/{id}` |
@@ -179,7 +193,7 @@ O backend é uma API FastAPI modular orientada a domínios. A **Fase 1.5** entre
 - Node.js 20+
 - Python 3.13
 - [uv](https://docs.astral.sh/uv/) — `pip install uv`
-- PostgreSQL 15+ (para a Fase 2 — banco de dados real)
+- PostgreSQL 15+ — obrigatório; a API não sobe sem banco
 
 ### Frontend
 
@@ -202,12 +216,19 @@ cd back-end
 # Instalar dependências (cria .venv automaticamente)
 uv sync
 
+# Criar os bancos de desenvolvimento e de testes
+createdb vida_com_deus
+createdb vida_com_deus_test
+
 # Configurar variáveis de ambiente
 cp .env.example .env
-# Gere o JWT_SECRET_KEY: python -c "import secrets; print(secrets.token_hex(32))"
-# Configure DATABASE_URL no .env para PostgreSQL (Fase 2)
+# JWT_SECRET_KEY e DATABASE_URL são obrigatórios — não têm valor padrão.
+# Gere o segredo: python -c "import secrets; print(secrets.token_urlsafe(48))"
 
-# Aplicar migrações do banco de dados (requer PostgreSQL configurado)
+# Conferir a configuração antes de subir (mesmo passo do CI)
+uv run python -m app.core.config_check
+
+# Aplicar migrações (criam o banco do zero)
 uv run alembic upgrade head
 
 # Iniciar servidor (uv run ativa o .venv automaticamente)
@@ -215,6 +236,17 @@ uv run uvicorn app.main:app --reload
 ```
 
 API disponível em `http://localhost:8000` · Swagger UI em `http://localhost:8000/docs`.
+
+### Testes do backend
+
+```bash
+cd back-end
+uv run pytest tests/unit           # sem banco
+TEST_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/vida_com_deus_test \
+  uv run pytest                    # suíte completa, com banco isolado
+```
+
+Sem `TEST_DATABASE_URL` os testes de banco são pulados com motivo explícito. No CI (`.github/workflows/backend-ci.yml`), `REQUIRE_DB=1` transforma esse pulo em falha — a suíte só passa tendo realmente tocado o PostgreSQL.
 
 ---
 

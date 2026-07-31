@@ -111,34 +111,43 @@ Documentação interativa disponível em `http://localhost:8000/docs` (Swagger U
 
 ### Camadas
 
-**Estado atual (Fase 2):** Modelos SQLAlchemy 2.0 async, repositórios e serviços implementados.
-Migrações Alembic para PostgreSQL com 4 versões cobrindo todos os domínios (incluindo `storage_snapshots`).
-Chat bíblico integrado ao GPT-4o-mini (fallback mock quando `OPENAI_API_KEY` ausente).
-Métricas de storage e alertas do admin agora leem dados reais do PostgreSQL via `pg_database_size()`.
-Arquivos JSON locais (`data/`) mantidos como fallback de leitura durante transição.
-Redis planejado para Fase 3.
+**Estado atual (Fase 2):** autenticação e persistência reais sobre PostgreSQL — modelos
+SQLAlchemy 2.0 async, repositórios, serviços e 6 migrações Alembic que criam o banco do zero.
+Métricas de storage e alertas do admin leem dados reais via `pg_database_size()`.
+
+Estado por categoria:
+
+| Funcionalidade | Estado |
+| --- | --- |
+| Auth (cadastro, login, sessões, rotação/revogação de refresh) | **Implementado** |
+| Usuários, posts, biblioteca, chat, métricas admin | **Implementado** (PostgreSQL) |
+| Recuperação de senha | **Parcial** — token criado, sem envio de email |
+| Chat com IA | **Implementado** — sem `OPENAI_API_KEY`: stub declarado em dev, 503 em produção |
+| Painel therapist | **Simulado** — persiste em `data/patients.json` |
+| Redis / workers | **Planejado** (Fase 3) |
 
 ```text
 app/
 ├── api/v1/          # Routers FastAPI (auth, users, posts, library, chat, admin, therapist)
-├── core/            # config.py (Pydantic Settings), security.py (JWT + Argon2),
-│                    # dependencies.py, storage.py (JSON), scraper.py (ETL), database.py (SQLAlchemy)
+├── core/            # config.py (Settings validadas na inicialização), config_check.py,
+│                    # security.py (JWT tipado), dependencies.py (autenticação),
+│                    # database.py (sessão async), storage.py (JSON — therapist/ETL), scraper.py
 ├── domain/          # Schemas Pydantic por domínio (request/response da API)
-├── models/          # Modelos SQLAlchemy 2.0 (User, Post, Favorite, Conversation, etc.)
+├── models/          # SQLAlchemy 2.0 (User, RefreshToken por sessão, Post, Conversation, etc.)
 ├── repositories/    # Acesso a dados async (user, post, library, chat)
-└── services/        # Lógica de negócio (auth, user, post, library, chat)
-migrations/          # Alembic — 4 migrações versionadas (inclui storage_snapshots)
-data/                # Persistência JSON local (fallback Fase 1.5)
-├── posts.json       # Posts coletados pelo ETL
-├── patients.json    # Pacientes do dashboard do psicólogo
-├── favorites.json   # Favoritos da biblioteca por usuário
-├── users.json       # Perfil do usuário autenticado
+├── services/        # Lógica de negócio (auth, user, post, library, chat)
+└── integrations/    # openai_client.py — assistente real + stub declarado
+migrations/          # Alembic — 6 migrações versionadas
+data/                # JSON local — usado apenas pelo therapist e histórico de ETL
+├── patients.json    # Pacientes do dashboard do psicólogo (não migrado)
 └── etl_runs.json    # Histórico das execuções de ETL (últimas 20)
 ```
 
 **Roteamento:** `app/api/router.py` agrega todos os domínios sob o prefixo `/v1`. Ponto de entrada: `app/main.py`.
 
-**Autenticação:** JWT com par access/refresh token. Lógica em `app/core/security.py`. Access token: 15 min; refresh token: 7 dias.
+**Autenticação:** JWT com par access/refresh tipados (claim `type` obrigatório) e sessão (`sid`).
+Access token: 15 min; refresh: 7 dias, com rotação, revogação e detecção de reuso. No banco só
+o SHA-256 do refresh; senhas apenas como hash Argon2. Detalhes em `back-end/CLAUDE.md`.
 
 **CORS:** configurado para `localhost:5173` e `localhost:3000`.
 
@@ -146,7 +155,7 @@ data/                # Persistência JSON local (fallback Fase 1.5)
 
 | Domínio | Prefixo |
 | ------- | ------- |
-| Auth | `POST /v1/auth/{signup,login,refresh,logout,forgot-password,reset-password}` |
+| Auth | `POST /v1/auth/{signup,login,refresh,logout,logout-all,forgot-password,reset-password}` |
 | Usuário | `GET/PATCH /v1/users/me`, `GET/PATCH /v1/users/me/settings` |
 | Posts | `GET /v1/posts/feed`, `GET /v1/posts/{id}`, `GET /v1/posts/{id}/audio` |
 | Biblioteca | `GET /v1/library/`, `POST/DELETE /v1/library/favorites/{id}` |
@@ -161,6 +170,8 @@ data/                # Persistência JSON local (fallback Fase 1.5)
 
 - `back-end/arquitetura-back-end.md` — decisões arquiteturais, contratos de API, estratégia de testes
 - `back-end/docs/decisoes-fase2.md` — decisões arquiteturais da Fase 2 (PostgreSQL, Argon2, Alembic)
+- `docs/tasks/auth-persistence-plan.md` — plano e decisões da migração de autenticação/sessões
+- `back-end/docs/testes.md` — estratégia e matriz de testes
 - `front-end/docs/etapas.md` — histórico de trabalho concluído
 - `front-end/docs/registro-features.md` — template obrigatório para registrar novas features
 
