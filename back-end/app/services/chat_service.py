@@ -1,5 +1,5 @@
-import os
 import uuid
+from typing import Literal
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,53 +12,17 @@ from app.domain.chat.schemas import (
     MessagesResponse,
     SendMessageResponse,
 )
+from app.integrations.openai_client import BiblicalAssistant, build_assistant
 from app.models.chat import ChatMessage as ChatMessageModel
 from app.repositories.chat_repository import ChatRepository
 
-# ── Prompt de sistema — especialista bíblico ─────────────────────────────────
-SYSTEM_PROMPT = """Você é um especialista em Bíblia Sagrada com profundo conhecimento das escrituras cristãs.
-Responda sempre em Português do Brasil de forma pastoral, respeitosa e edificante.
-Ao citar versículos, indique o livro, capítulo e versículo (ex.: "João 3:16").
-Baseie suas respostas exclusivamente nas escrituras bíblicas.
-Seja conciso, claro e espiritualmente enriquecedor."""
-
-
-def _call_openai(user_message: str) -> tuple[str, list[dict]]:
-    """
-    Chama o GPT-4o-mini com o prompt bíblico.
-    Retorna (conteúdo da resposta, lista de dicts de citação).
-    Faz fallback para resposta mock se a chave não estiver configurada.
-    """
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        return (
-            "Com base na sua pergunta, posso compartilhar que a Bíblia oferece "
-            "sabedoria profunda sobre este tema. "
-            "Provérbios 3:5-6 nos instrui a confiar no Senhor de todo o coração "
-            "e não nos apoiar no nosso próprio entendimento.",
-            [{"reference": "Provérbios 3:5-6", "book": "Provérbios", "chapter": 3, "verse": "5-6"}],
-        )
-
-    from openai import OpenAI
-
-    client = OpenAI(api_key=api_key)
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_message},
-        ],
-        max_tokens=600,
-        temperature=0.7,
-    )
-    content = response.choices[0].message.content or ""
-    return content, []
-
 
 class ChatService:
-    def __init__(self, db: AsyncSession) -> None:
+    def __init__(self, db: AsyncSession, assistant: BiblicalAssistant | None = None) -> None:
         self.db = db
         self.repo = ChatRepository(db)
+        # Injetável para que os testes nunca dependam de rede.
+        self._assistant = assistant
 
     async def create_conversation(self, user_id: str) -> Conversation:
         """Cria nova conversa para o usuário."""
@@ -68,15 +32,11 @@ class ChatService:
     async def list_conversations(self, user_id: str) -> ConversationListResponse:
         """Lista conversas do usuário."""
         convs = await self.repo.list_conversations(uuid.UUID(user_id))
-        return ConversationListResponse(
-            conversations=[self._conv_to_schema(c) for c in convs]
-        )
+        return ConversationListResponse(conversations=[self._conv_to_schema(c) for c in convs])
 
     async def get_messages(self, conversation_id: str, user_id: str) -> MessagesResponse:
         """Retorna mensagens de uma conversa verificando ownership."""
-        conv = await self.repo.get_conversation(
-            uuid.UUID(conversation_id), uuid.UUID(user_id)
-        )
+        conv = await self.repo.get_conversation(uuid.UUID(conversation_id), uuid.UUID(user_id))
         if not conv:
             raise HTTPException(status_code=404, detail="Conversa não encontrada.")
 
@@ -89,10 +49,8 @@ class ChatService:
     async def send_message(
         self, conversation_id: str, user_id: str, content: str
     ) -> SendMessageResponse:
-        """Envia mensagem, chama OpenAI e persiste resposta."""
-        conv = await self.repo.get_conversation(
-            uuid.UUID(conversation_id), uuid.UUID(user_id)
-        )
+        """Persiste a mensagem do usuário, consulta o assistente e persiste a resposta."""
+        conv = await self.repo.get_conversation(uuid.UUID(conversation_id), uuid.UUID(user_id))
         if not conv:
             raise HTTPException(status_code=404, detail="Conversa não encontrada.")
 
@@ -101,8 +59,8 @@ class ChatService:
             uuid.UUID(conversation_id), role="user", content=content, citations=[]
         )
 
-        # Chama OpenAI (ou fallback mock)
-        ai_content, citations = _call_openai(content)
+        assistant = self._assistant or build_assistant()
+        ai_content, citations = assistant.reply(content)
 
         # Persiste resposta da IA com citações
         ai_msg = await self.repo.add_message(
@@ -131,9 +89,11 @@ class ChatService:
 
     @staticmethod
     def _msg_to_schema(msg: ChatMessageModel) -> ChatMessage:
+        # No banco role é str; o schema restringe ao literal "user" | "assistant".
+        role: Literal["user", "assistant"] = "assistant" if msg.role == "assistant" else "user"
         return ChatMessage(
             id=str(msg.id),
-            role=msg.role,
+            role=role,
             content=msg.content,
             citations=[
                 Citation(
