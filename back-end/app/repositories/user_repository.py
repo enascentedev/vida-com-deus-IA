@@ -1,7 +1,7 @@
 """Repositório de acesso a dados para o domínio de usuários."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,10 +38,17 @@ class UserRepository:
     # ── Refresh Token ─────────────────────────────────────────────────────────
 
     async def save_refresh_token(
-        self, user_id: uuid.UUID, token_hash: str, expires_at: datetime
+        self,
+        user_id: uuid.UUID,
+        session_id: uuid.UUID,
+        token_hash: str,
+        expires_at: datetime,
     ) -> RefreshToken:
         token = RefreshToken(
-            user_id=user_id, token_hash=token_hash, expires_at=expires_at
+            user_id=user_id,
+            session_id=session_id,
+            token_hash=token_hash,
+            expires_at=expires_at,
         )
         self.db.add(token)
         await self.db.flush()
@@ -56,15 +63,26 @@ class UserRepository:
     async def revoke_refresh_token(self, token_hash: str) -> None:
         await self.db.execute(
             update(RefreshToken)
-            .where(RefreshToken.token_hash == token_hash)
-            .values(is_revoked=True)
+            .where(RefreshToken.token_hash == token_hash, RefreshToken.is_revoked.is_(False))
+            .values(is_revoked=True, revoked_at=datetime.now(UTC))
+        )
+
+    async def revoke_session(self, session_id: uuid.UUID) -> None:
+        """Revoga toda a cadeia de rotação de uma sessão."""
+        await self.db.execute(
+            update(RefreshToken)
+            .where(
+                RefreshToken.session_id == session_id,
+                RefreshToken.is_revoked.is_(False),
+            )
+            .values(is_revoked=True, revoked_at=datetime.now(UTC))
         )
 
     async def revoke_all_user_tokens(self, user_id: uuid.UUID) -> None:
         await self.db.execute(
             update(RefreshToken)
-            .where(RefreshToken.user_id == user_id, RefreshToken.is_revoked == False)  # noqa: E712
-            .values(is_revoked=True)
+            .where(RefreshToken.user_id == user_id, RefreshToken.is_revoked.is_(False))
+            .values(is_revoked=True, revoked_at=datetime.now(UTC))
         )
 
     # ── Password Reset Token ─────────────────────────────────────────────────
@@ -72,9 +90,7 @@ class UserRepository:
     async def save_password_reset_token(
         self, user_id: uuid.UUID, token_hash: str, expires_at: datetime
     ) -> PasswordResetToken:
-        token = PasswordResetToken(
-            user_id=user_id, token_hash=token_hash, expires_at=expires_at
-        )
+        token = PasswordResetToken(user_id=user_id, token_hash=token_hash, expires_at=expires_at)
         self.db.add(token)
         await self.db.flush()
         return token
@@ -88,9 +104,7 @@ class UserRepository:
     # ── User Settings ─────────────────────────────────────────────────────────
 
     async def get_or_create_settings(self, user_id: uuid.UUID) -> UserSettings:
-        result = await self.db.execute(
-            select(UserSettings).where(UserSettings.user_id == user_id)
-        )
+        result = await self.db.execute(select(UserSettings).where(UserSettings.user_id == user_id))
         settings = result.scalar_one_or_none()
         if settings is None:
             settings = UserSettings(user_id=user_id)

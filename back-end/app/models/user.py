@@ -21,14 +21,23 @@ class User(BaseModel):
 
 
 class RefreshToken(BaseModel):
+    """Um elo da cadeia de rotação de uma sessão.
+
+    Cada rotação grava uma nova linha com o mesmo `session_id` e revoga a
+    anterior. O token em si nunca é armazenado — apenas seu hash. Apresentar um
+    elo já revogado indica reuso e derruba a sessão inteira.
+    """
+
     __tablename__ = "refresh_tokens"
 
     user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
+    session_id: Mapped[uuid.UUID] = mapped_column(index=True, nullable=False)
     token_hash: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_revoked: Mapped[bool] = mapped_column(default=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class PasswordResetToken(BaseModel):
