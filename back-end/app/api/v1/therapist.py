@@ -1,11 +1,13 @@
 """Endpoints do Dashboard do Psicólogo (Fase 1 — dados persistidos em JSON)."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.dependencies import get_current_user_id  # TODO Fase 2: adicionar require_therapist_role
+from app.core.dependencies import (
+    get_current_user_id,  # TODO Fase 2: adicionar require_therapist_role
+)
 from app.core.storage import read_json, write_json
 from app.domain.therapist.schemas import (
     CreateSessionRequest,
@@ -29,7 +31,7 @@ PATIENTS_FILE = "patients.json"
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _gen_id(prefix: str = "pat") -> str:
@@ -63,7 +65,8 @@ MOCK_PATIENTS: list[dict] = [
                 "id": "sess-001",
                 "patient_id": "pat-001",
                 "date": "2025-11-01",
-                "summary": "Paciente relata melhora na qualidade do sono após exercícios de respiração.",
+                "summary": "Paciente relata melhora na qualidade do sono "
+                "após exercícios de respiração.",
                 "mood": "good",
                 "topics_covered": ["sono", "respiração", "rotina"],
                 "homework": "Praticar respiração diafragmática antes de dormir",
@@ -74,7 +77,8 @@ MOCK_PATIENTS: list[dict] = [
                 "id": "sess-002",
                 "patient_id": "pat-001",
                 "date": "2025-11-15",
-                "summary": "Discutimos gatilhos de ansiedade no trabalho. Reestruturação cognitiva aplicada.",
+                "summary": "Discutimos gatilhos de ansiedade no trabalho. "
+                "Reestruturação cognitiva aplicada.",
                 "mood": "neutral",
                 "topics_covered": ["ansiedade", "trabalho", "pensamentos automáticos"],
                 "homework": "Diário de pensamentos automáticos",
@@ -107,7 +111,8 @@ MOCK_PATIENTS: list[dict] = [
                 "id": "sess-003",
                 "patient_id": "pat-002",
                 "date": "2025-10-05",
-                "summary": "Sessão focada em memórias positivas do familiar. Paciente chorou mas sentiu alívio.",
+                "summary": "Sessão focada em memórias positivas do familiar. "
+                "Paciente chorou mas sentiu alívio.",
                 "mood": "low",
                 "topics_covered": ["luto", "memórias", "aceitação"],
                 "homework": "Escrever carta para o familiar",
@@ -140,7 +145,8 @@ MOCK_PATIENTS: list[dict] = [
                 "id": "sess-004",
                 "patient_id": "pat-003",
                 "date": "2025-10-15",
-                "summary": "Primeira sessão. Anamnese inicial e estabelecimento de vínculo terapêutico.",
+                "summary": "Primeira sessão. Anamnese inicial e estabelecimento "
+                "de vínculo terapêutico.",
                 "mood": "neutral",
                 "topics_covered": ["anamnese", "expectativas", "vínculo"],
                 "homework": None,
@@ -162,7 +168,8 @@ MOCK_PATIENTS: list[dict] = [
                 "id": "sess-006",
                 "patient_id": "pat-003",
                 "date": "2025-11-12",
-                "summary": "Revisão do exercício de qualidades. Paciente relatou melhora significativa.",
+                "summary": "Revisão do exercício de qualidades. Paciente relatou "
+                "melhora significativa.",
                 "mood": "great",
                 "topics_covered": ["autoestima", "progresso", "assertividade"],
                 "homework": "Praticar comunicação assertiva em uma situação social",
@@ -175,6 +182,7 @@ MOCK_PATIENTS: list[dict] = [
 
 
 # ── Helpers de persistência ──────────────────────────────────────────────────
+
 
 def _load_patients() -> list[dict]:
     data = read_json(PATIENTS_FILE)
@@ -199,6 +207,7 @@ def _find_patient(patients: list[dict], patient_id: str) -> dict:
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
+
 @router.get("/overview", response_model=DashboardOverview)
 def get_overview(user_id: str = Depends(get_current_user_id)) -> DashboardOverview:
     """Retorna visão geral do dashboard do psicólogo."""
@@ -221,7 +230,9 @@ def get_overview(user_id: str = Depends(get_current_user_id)) -> DashboardOvervi
     ]
 
     recent = [
-        RecentActivity(patient_name=p["name"], action="Sessão registrada", timestamp=p["created_at"])
+        RecentActivity(
+            patient_name=p["name"], action="Sessão registrada", timestamp=p["created_at"]
+        )
         for p in sorted(patients, key=lambda x: x["created_at"], reverse=True)[:5]
     ]
 
@@ -287,7 +298,7 @@ def create_patient(
     }
 
     if body.first_session_date:
-        session = {
+        session: dict = {
             "id": _gen_id("sess"),
             "patient_id": patient_id,
             "date": body.first_session_date,

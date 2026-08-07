@@ -7,7 +7,10 @@ from app.core.config import settings
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="API do aplicativo Vida com Deus — devocionais, chat bíblico com IA e biblioteca pessoal.",
+    description=(
+        "API do aplicativo Vida com Deus — devocionais, chat bíblico com IA "
+        "e biblioteca pessoal."
+    ),
     docs_url="/docs",
     redoc_url="/redoc",
 )

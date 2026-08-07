@@ -2,289 +2,127 @@
 
 ## 1. Visão Geral
 
-O back-end adota uma estratégia de testes em camadas, organizada em cinco tipos distintos. Cada tipo cobre um nível diferente da aplicação e é executado em momentos específicos do ciclo de desenvolvimento.
+A suíte tem três camadas ativas e duas reservadas para fases futuras:
 
 ```
 tests/
-├── contract/     # Testes de contrato — status HTTP e schemas de resposta
-├── unit/         # Testes unitários — regras de negócio isoladas
-├── integration/  # Testes de integração — API + banco + cache
-├── e2e/          # Testes de ponta a ponta — fluxos completos do usuário
-└── load/         # Testes de carga — comportamento sob pico de requisições
+├── unit/         # JWT, configuração e schemas — sem banco, sem rede
+├── integration/  # Auth, tokens, autorização e chat contra PostgreSQL real
+├── contract/     # Status HTTP e formato de resposta (serviços mockados)
+├── e2e/          # Fluxos ponta a ponta (Fase 3 — vazio)
+└── load/         # Carga (Fase 4 — vazio)
 ```
 
-**Estado atual:** Fase 1 concluída. Apenas os testes de contrato estão implementados. Os demais diretórios estão preparados para as fases seguintes.
+**Estado atual:** unitários, integração e contrato implementados. Os diretórios `e2e/`
+e `load/` seguem vazios — nenhum teste desses tipos existe hoje.
 
 ---
 
-## 2. Ferramentas e Configuração
+## 2. Como executar
 
-### Dependências de teste (`pyproject.toml`)
-
-| Pacote | Versão mínima | Função |
-|--------|---------------|--------|
-| `pytest` | 8.3.0 | Runner principal |
-| `pytest-asyncio` | 0.24.0 | Suporte a testes assíncronos |
-| `pytest-cov` | 5.0.0 | Relatório de cobertura |
-| `httpx` | 0.27.0 | Cliente HTTP para TestClient |
-
-### Configuração do pytest (`pyproject.toml`)
-
-```toml
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-testpaths = ["tests"]
-```
-
-- `asyncio_mode = "auto"` — todos os testes `async def` são detectados automaticamente.
-- `testpaths = ["tests"]` — o pytest busca testes apenas dentro da pasta `tests/`.
-
----
-
-## 3. Como Executar os Testes
-
-O projeto usa `uv` para gerenciar o ambiente virtual. Todos os comandos devem ser executados a partir da pasta `back-end/`.
-
-### Executar tudo
+Todos os comandos a partir de `back-end/`.
 
 ```bash
-uv run pytest
-```
-
-### Executar apenas os testes de contrato
-
-```bash
-uv run pytest tests/contract -v
-```
-
-### Executar com relatório de cobertura
-
-```bash
+uv run pytest                      # tudo; testes de banco pulam sem TEST_DATABASE_URL
+uv run pytest tests/unit -v        # só unitários
 uv run pytest --cov=app --cov-report=term-missing
+
+# Integração (exige banco isolado — nunca o de desenvolvimento)
+TEST_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/vida_com_deus_test \
+  uv run pytest tests/integration -v
 ```
 
-### Executar um único arquivo de teste
+### O banco de teste
+
+`tests/conftest.py` cria o schema aplicando as **migrations reais** (`alembic upgrade head`)
+uma vez por sessão e trunca todas as tabelas entre os testes
+(`TRUNCATE ... RESTART IDENTITY CASCADE`). Cada teste começa com o banco vazio.
+
+Nenhum teste depende de serviço externo de IA: o `ChatService` recebe um assistente
+injetado (`BiblicalAssistant`) nos testes, e a OpenAI nunca é chamada.
+
+### Testes pulados nunca passam despercebidos
+
+Testes marcados com `@pytest.mark.db` exigem `TEST_DATABASE_URL`. Sem ela, são **pulados
+com motivo explícito**. No CI, `REQUIRE_DB=1` faz o mesmo caso virar **erro**: a suíte não
+pode passar sem ter tocado o banco. Isso existe para que "todos os testes passaram" nunca
+signifique "os testes de banco não rodaram".
+
+---
+
+## 3. Cobertura por camada
+
+### 3.1 Unitários (`tests/unit/`)
+
+| Arquivo | O que cobre |
+|---|---|
+| `test_security.py` | Claims do access e do refresh token (`sub`, `sid`, `type`, `exp`, `jti`); recusa de token sem `type`, com tipo trocado, expirado, assinado com outro segredo, malformado e sem `sub`; refresh recusado onde se espera access |
+| `test_config.py` | Segredo curto e valores de placeholder recusados; algoritmo fora da lista permitida recusado; `DATABASE_URL` sem driver async recusada; configuração válida aceita; `is_production` |
+| `test_auth_schemas.py` | Senha abaixo do mínimo e acima do máximo; email normalizado (espaços e maiúsculas); email inválido; nome vazio |
+| `test_openai_client.py` | Stub declara que é simulado; produção sem chave responde 503; com chave escolhe a implementação real |
+
+### 3.2 Integração (`tests/integration/`)
+
+| Arquivo | O que cobre |
+|---|---|
+| `test_auth_signup_login.py` | Cadastro com sucesso; email duplicado (409); email normalizado no cadastro e no login; senha inválida (422); payload inválido (422); login válido; senha incorreta; usuário inexistente; resposta sem hash de senha; claims esperadas no token |
+| `test_token_lifecycle.py` | Refresh válido; access usado como refresh; refresh expirado; refresh revogado; rotação; reutilização do token anterior derrubando a sessão; usuário desativado; logout; reuso após logout; idempotência do logout; `logout-all` |
+| `test_authorization.py` | Ausência de token; token inválido; refresh em rota protegida; usuário acessa os próprios dados; não acessa dados de outro; conversa inexistente; mensagem em conversa de outro usuário |
+| `test_chat_persistence.py` | Criação e listagem de conversa; criação de mensagem; histórico; ordem temporal; isolamento entre usuários |
+
+### 3.3 Contrato (`tests/contract/`)
+
+`test_endpoints.py` valida status HTTP e formato de resposta de todos os endpoints com
+autenticação e serviços substituídos por fixtures. Os overrides ficam em fixture com
+teardown — não vazam para os testes de integração.
+
+### 3.4 Recuperação de senha e perfil
+
+| Arquivo | O que cobre |
+|---|---|
+| `test_password_recovery.py` | resposta indistinguível para email inexistente; hash do token; troca de senha; revogação das sessões; token inválido, expirado e reutilizado |
+| `test_user_profile.py` | atualização de perfil; criação, leitura e persistência das configurações do usuário |
+
+`tests/unit/test_auth_service_failures.py` cobre ainda os ramos de falha que não
+precisam de banco: email duplicado, usuário inativo, refresh ausente/revogado ou
+com sujeito divergente, sessão malformada e token de reset órfão.
+
+---
+
+## 4. Cobertura de código
+
+Meta obrigatória: **≥ 80% nos módulos de autenticação e autorização**, verificada no CI:
 
 ```bash
-uv run pytest tests/contract/test_endpoints.py -v
+uv run pytest \
+  --cov=app.core.security --cov=app.core.dependencies --cov=app.core.config \
+  --cov=app.services.auth_service --cov=app.repositories.user_repository \
+  --cov=app.domain.auth --cov-fail-under=80
 ```
 
-### Executar um único teste pelo nome
+Relatório navegável: `uv run pytest --cov=app --cov-report=html` → `htmlcov/index.html`.
 
-```bash
-uv run pytest tests/contract/test_endpoints.py::test_login -v
-```
-
-### Flags úteis
-
-| Flag | Efeito |
-|------|--------|
-| `-v` | Exibe o nome de cada teste (modo verbose) |
-| `-s` | Exibe prints e logs durante os testes |
-| `--tb=short` | Traceback resumido em falhas |
-| `--tb=long` | Traceback completo em falhas |
-| `-x` | Para na primeira falha |
-| `-k "nome"` | Filtra testes pelo nome |
+Validação local de 31/07/2026 contra PostgreSQL 16 real: **130 testes passaram**
+e a cobertura dos módulos de autenticação/autorização ficou em **85,64%**.
 
 ---
 
-## 4. Testes de Contrato (Fase 1 — implementados)
+## 5. CI
 
-**Arquivo:** `tests/contract/test_endpoints.py`
+`.github/workflows/backend-ci.yml` executa, contra um serviço `postgres:16`:
 
-**Objetivo:** Garantir que todos os endpoints retornam o status HTTP correto e que os schemas de resposta contêm os campos esperados pelo front-end. Não há banco de dados nem serviços externos envolvidos — todos os endpoints retornam dados mockados.
+1. checkout → 2. uv + Python 3.13 → 3. cache → 4. serviço PostgreSQL → 5. `uv sync --frozen`
+→ 6. `python -m app.core.config_check` → 7. `alembic upgrade head` e teste de rollback
+→ 8. `ruff check` → 9. `black --check` → 10. `mypy app` → 11. `pytest` com `REQUIRE_DB=1`
+→ 12. cobertura com `--cov-fail-under=80` → 13. import da aplicação.
 
-**Mecanismo:** Usa `fastapi.testclient.TestClient`, que executa a aplicação em memória sem abrir um servidor real.
-
-```python
-from fastapi.testclient import TestClient
-from app.main import app
-
-client = TestClient(app)
-AUTH_HEADER = {"Authorization": "Bearer mock-token"}
-```
-
-O header `Authorization: Bearer mock-token` é aceito por todos os endpoints protegidos na Fase 1 (a validação real de JWT é implementada na Fase 2).
-
-### 4.1 Cobertura dos testes
-
-#### Health
-
-| Teste | Endpoint | Status esperado | Campos verificados |
-|-------|----------|-----------------|-------------------|
-| `test_health` | `GET /health` | 200 | `status`, `version` |
-
-#### Auth
-
-| Teste | Endpoint | Status esperado | Campos verificados |
-|-------|----------|-----------------|-------------------|
-| `test_signup` | `POST /v1/auth/signup` | 201 | `access_token`, `refresh_token`, `token_type` |
-| `test_login` | `POST /v1/auth/login` | 200 | `access_token`, `refresh_token` |
-| `test_refresh` | `POST /v1/auth/refresh` | 200 | `access_token` |
-| `test_forgot_password` | `POST /v1/auth/forgot-password` | 200 | `message` |
-| `test_reset_password` | `POST /v1/auth/reset-password` | 200 | `message` |
-| `test_logout` | `POST /v1/auth/logout` | 200 | `message` |
-
-#### Usuários
-
-| Teste | Endpoint | Status esperado | Campos verificados |
-|-------|----------|-----------------|-------------------|
-| `test_get_me` | `GET /v1/users/me` | 200 | `id`, `name`, `email` |
-| `test_update_me` | `PATCH /v1/users/me` | 200 | `name` (valor enviado) |
-| `test_get_settings` | `GET /v1/users/me/settings` | 200 | `theme`, `ai_insights`, `biblical_reminders`, `rag_memory` |
-| `test_update_settings` | `PATCH /v1/users/me/settings` | 200 | `theme` (valor enviado) |
-
-#### Posts
-
-| Teste | Endpoint | Status esperado | Campos verificados |
-|-------|----------|-----------------|-------------------|
-| `test_get_feed` | `GET /v1/posts/feed` | 200 | `post_of_day`, `recent_posts` (lista) |
-| `test_list_posts` | `GET /v1/posts` | 200 | lista de posts |
-| `test_list_posts_with_query` | `GET /v1/posts?query=Paz` | 200 | todos os resultados contêm "Paz" no título |
-| `test_get_post_detail` | `GET /v1/posts/post-001` | 200 | `title`, `verse_content`, `ai_summary`, `tags`, `key_points` |
-| `test_get_post_audio` | `GET /v1/posts/post-001/audio` | 200 | `url`, `duration` |
-
-#### Biblioteca
-
-| Teste | Endpoint | Status esperado | Campos verificados |
-|-------|----------|-----------------|-------------------|
-| `test_get_favorites` | `GET /v1/library?tab=favorites` | 200 | `items` (lista), `total` |
-| `test_get_history` | `GET /v1/library?tab=history` | 200 | `items` (lista) |
-| `test_add_favorite` | `POST /v1/library/favorites/post-001` | 201 | `is_favorited: true`, `post_id` |
-| `test_remove_favorite` | `DELETE /v1/library/favorites/post-001` | 200 | `is_favorited: false` |
-| `test_record_history` | `POST /v1/library/history` | 201 | `message` |
-
-#### Chat
-
-| Teste | Endpoint | Status esperado | Campos verificados |
-|-------|----------|-----------------|-------------------|
-| `test_create_conversation` | `POST /v1/chat/conversations` | 201 | `id`, `user_id` |
-| `test_list_conversations` | `GET /v1/chat/conversations` | 200 | `conversations` |
-| `test_get_messages` | `GET /v1/chat/conversations/conv-001/messages` | 200 | `conversation_id`, `messages` (pelo menos 1, com `role` válido) |
-| `test_send_message` | `POST /v1/chat/conversations/conv-001/messages` | 201 | `user_message`, `assistant_message` (com `role: assistant` e `citations`) |
-
-#### Admin
-
-| Teste | Endpoint | Status esperado | Campos verificados |
-|-------|----------|-----------------|-------------------|
-| `test_get_storage_metrics` | `GET /v1/admin/metrics/storage` | 200 | `usage_percent`, `used_gb`, `total_gb` |
-| `test_get_growth_metrics` | `GET /v1/admin/metrics/growth` | 200 | `percentage`, `history` (7 itens) |
-| `test_get_etl_runs` | `GET /v1/admin/etl/runs` | 200 | `runs` (pelo menos 1, com `status` válido) |
-| `test_execute_etl` | `POST /v1/admin/etl/runs/execute` | 202 | `run_id`, `status: running` |
-| `test_get_alerts` | `GET /v1/admin/alerts` | 200 | `alerts` (pelo menos 1, com `level` válido) |
-
-**Total: 26 testes cobrindo todos os endpoints do MVP.**
+O `JWT_SECRET_KEY` é gerado dentro do job; nenhum segredo real aparece no workflow.
 
 ---
 
-## 5. Testes Unitários (Fase 2 — planejados)
+## 6. O que ainda não existe
 
-**Diretório:** `tests/unit/`
-
-**Objetivo:** Testar regras de negócio isoladas, sem dependência de banco, HTTP ou serviços externos.
-
-### O que será testado
-
-- `app/core/security.py` — criação e validação de JWT (access e refresh token)
-- `app/core/security.py` — hash e verificação de senha
-- Lógica de filtragem e ordenação de posts
-- Regras de negócio da biblioteca (impedir duplicata de favorito, etc.)
-- Formatação de respostas do chat
-
-### Exemplo de estrutura esperada
-
-```
-tests/unit/
-├── test_security.py       # JWT, hash de senha
-├── test_posts_logic.py    # Ordenação, filtragem
-└── test_library_logic.py  # Regras de favoritos
-```
-
----
-
-## 6. Testes de Integração (Fase 2 — planejados)
-
-**Diretório:** `tests/integration/`
-
-**Objetivo:** Validar a comunicação entre as camadas da aplicação (API → service → repository → banco de dados).
-
-**Pré-requisitos:** PostgreSQL e Redis rodando (via Docker Compose ou instâncias locais). Banco de teste separado do banco de desenvolvimento.
-
-### O que será testado
-
-- Persistência e leitura de usuários no PostgreSQL
-- Cache de feed no Redis
-- Fluxo completo de auth (signup → login → refresh → logout) com dados reais no banco
-- Adição e remoção de favoritos com validação no banco
-
-### Convenção de setup
-
-Cada teste de integração deve usar uma fixture que cria um banco isolado e o limpa após o teste.
-
----
-
-## 7. Testes E2E (Fase 3 — planejados)
-
-**Diretório:** `tests/e2e/`
-
-**Objetivo:** Simular fluxos completos do usuário de ponta a ponta, com servidor rodando e banco real.
-
-### Fluxos mínimos obrigatórios (definidos na arquitetura)
-
-1. Cadastro → login → acesso ao feed
-2. Recuperação de senha (forgot → reset → login)
-3. Leitura de post detalhado
-4. Adição e remoção de favorito
-5. Envio de mensagem no chat e retorno com citações bíblicas
-6. Consulta ao painel admin com autenticação de perfil admin
-
----
-
-## 8. Testes de Carga (Fase 4 — planejados)
-
-**Diretório:** `tests/load/`
-
-**Objetivo:** Validar o comportamento da API sob pico de requisições.
-
-### Metas de performance (definidas na arquitetura)
-
-| Cenário | Meta |
-|---------|------|
-| p95 de endpoints de leitura (sem IA) | < 300ms |
-| p95 de endpoints de auth | < 400ms |
-| Taxa de erro HTTP 5xx | < 1% |
-| Disponibilidade alvo | ≥ 99,5% |
-
-### Ferramenta sugerida
-
-`locust` ou `k6` — a definir na Fase 4.
-
----
-
-## 9. Cobertura de Código
-
-Para gerar o relatório de cobertura:
-
-```bash
-uv run pytest --cov=app --cov-report=term-missing
-```
-
-Para gerar relatório HTML navegável:
-
-```bash
-uv run pytest --cov=app --cov-report=html
-# Abre htmlcov/index.html no browser
-```
-
-Meta de cobertura para Fase 2: **≥ 80%** nas camadas `services/` e `core/`.
-
----
-
-## 10. Roadmap de Testes por Fase
-
-| Fase | Testes ativos | Objetivo |
-|------|---------------|---------|
-| **Fase 1** (atual) | Contrato | Validar que todos os endpoints existem e retornam schemas corretos |
-| **Fase 2** | + Unitários + Integração | Cobrir regras de negócio e persistência no PostgreSQL |
-| **Fase 3** | + E2E | Validar fluxos completos com integração de IA |
-| **Fase 4** | + Carga | Garantir performance e estabilidade em produção |
+- **E2E** (`tests/e2e/`): nenhum teste. Fluxos completos com servidor real ficam para a Fase 3.
+- **Carga** (`tests/load/`): nenhum teste. Ferramenta a definir (locust ou k6) na Fase 4.
+- **Recuperação de senha ponta a ponta**: sem envio de email, o fluxo não é testável além
+  da criação e do consumo do token.

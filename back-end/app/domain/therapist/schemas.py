@@ -2,8 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr
 
-
 # --- Sessao Terapeutica ---
+
 
 class TherapySession(BaseModel):
     id: str
@@ -18,6 +18,7 @@ class TherapySession(BaseModel):
 
 
 # --- Paciente: ficha completa ---
+
 
 class PatientConfig(BaseModel):
     id: str
@@ -50,6 +51,7 @@ class PatientConfig(BaseModel):
 
 # --- Paciente: versao resumida para listagem ---
 
+
 class PatientSummary(BaseModel):
     id: str
     name: str
@@ -61,6 +63,7 @@ class PatientSummary(BaseModel):
 
 
 # --- Request: cadastro (intake) ---
+
 
 class PatientIntakeForm(BaseModel):
     name: str
@@ -90,6 +93,7 @@ class PatientIntakeForm(BaseModel):
 
 # --- Response: visao geral do dashboard ---
 
+
 class NearLimitPatient(BaseModel):
     id: str
     name: str
@@ -114,12 +118,14 @@ class DashboardOverview(BaseModel):
 
 # --- Response: lista de pacientes ---
 
+
 class PatientListResponse(BaseModel):
     patients: list[PatientSummary]
     total: int
 
 
 # --- Request: atualizacao parcial do paciente ---
+
 
 class UpdatePatientConfigRequest(BaseModel):
     chief_complaint: str | None = None
@@ -137,17 +143,20 @@ class UpdatePatientConfigRequest(BaseModel):
 
 # --- Request: atualizar status ---
 
+
 class UpdatePatientStatusRequest(BaseModel):
     status: Literal["active", "paused", "discharged"]
 
 
 # --- Request: atualizar limite de mensagens ---
 
+
 class UpdateMessageLimitRequest(BaseModel):
     messages_limit: int
 
 
 # --- Request: criar sessao ---
+
 
 class CreateSessionRequest(BaseModel):
     date: str
@@ -159,6 +168,7 @@ class CreateSessionRequest(BaseModel):
 
 
 # --- Response: lista de sessoes ---
+
 
 class SessionListResponse(BaseModel):
     sessions: list[TherapySession]

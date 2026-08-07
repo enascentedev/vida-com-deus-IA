@@ -1,6 +1,6 @@
 """ETL de scraping para https://www.wgospel.com/tempoderefletir/
 
-Coleta reflexões diárias e salva em data/posts.json.
+Coleta reflexões diárias e persiste no banco de dados via PostRepository.
 
 Estrutura DOM da listagem (tema BeTheme/WordPress):
   div.post-item
@@ -12,13 +12,13 @@ Estrutura DOM da listagem (tema BeTheme/WordPress):
 """
 
 import re
-import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from bs4 import BeautifulSoup, Tag
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.storage import read_json, write_json
+from app.repositories.post_repository import PostRepository
 
 SOURCE_URL = "https://www.wgospel.com/tempoderefletir/"
 
@@ -30,12 +30,52 @@ _HEADERS = {
     ),
 }
 
+# Suporta intervalo com traço ("15:23-24"), meia-risca ("15:23–24")
+# e conector português "e" ("15:23 e 24")
 _VERSE_REF_RE = re.compile(
     r"((?:[1-3]\s*)?[A-ZÀ-Ú][a-zà-ú]+(?:\s+[a-zà-ú]+)*)"
-    r"\s+(\d+[.:]\d+(?:\s*[-–]\s*\d+)?)"
+    r"\s+(\d+[.:]\d+(?:\s*(?:[-–]|e)\s*\d+)?)"
     r"\s*[-–]\s*(.+)",
     re.DOTALL,
 )
+
+# Meses do calendário português → número com zero à esquerda
+_MONTH_BR: dict[str, str] = {
+    "janeiro": "01",
+    "fevereiro": "02",
+    "março": "03",
+    "abril": "04",
+    "maio": "05",
+    "junho": "06",
+    "julho": "07",
+    "agosto": "08",
+    "setembro": "09",
+    "outubro": "10",
+    "novembro": "11",
+    "dezembro": "12",
+}
+
+
+def _parse_date_br(date_text: str) -> str:
+    """Converte '22 de fevereiro de 2026' → '2026-02-22' (ISO 8601).
+
+    Retorna a string original inalterada se o padrão não casar.
+    """
+    if not date_text:
+        return date_text
+    m = re.match(
+        r"(\d{1,2})\s+de\s+([a-záéíóúâêîôûãõç]+)\s+de\s+(\d{4})",
+        date_text,
+        re.IGNORECASE,
+    )
+    if m:
+        day = m.group(1).zfill(2)
+        month = _MONTH_BR.get(m.group(2).lower())
+        year = m.group(3)
+        if month:
+            return f"{year}-{month}-{day}"
+    return date_text
+
 
 _PROMO_MARKERS = [
     "Saiba como receber",
@@ -54,7 +94,7 @@ _PROMO_MARKERS = [
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _is_promo(text: str) -> bool:
@@ -129,12 +169,12 @@ def _scrape_post_detail(url: str, client: httpx.Client) -> dict:
         return result
 
     header_idx = -1
-    for i, p in enumerate(paragraphs):
-        if re.match(r"TEMPO DE REFLETIR \d+", p):
+    for i, paragraph in enumerate(paragraphs):
+        if re.match(r"TEMPO DE REFLETIR \d+", paragraph):
             header_idx = i
             break
 
-    content_paragraphs = paragraphs[header_idx + 1:] if header_idx >= 0 else paragraphs
+    content_paragraphs = paragraphs[header_idx + 1 :] if header_idx >= 0 else paragraphs
 
     if content_paragraphs:
         first = content_paragraphs[0]
@@ -144,21 +184,21 @@ def _scrape_post_detail(url: str, client: httpx.Client) -> dict:
             content_paragraphs = content_paragraphs[1:]
 
     prayer_idx = -1
-    for i, p in enumerate(content_paragraphs):
-        if "ore comigo" in p.lower() or "reflita sobre isso" in p.lower():
+    for i, paragraph in enumerate(content_paragraphs):
+        if "ore comigo" in paragraph.lower() or "reflita sobre isso" in paragraph.lower():
             prayer_idx = i
             break
 
     if prayer_idx >= 0:
         body_parts = content_paragraphs[:prayer_idx]
         remaining = content_paragraphs[prayer_idx:]
-        for p in remaining:
-            if p.startswith(("Pai,", "Senhor,", "Deus,", "Jesus,")):
-                result["devotional_prayer"] = p
+        for paragraph in remaining:
+            if paragraph.startswith(("Pai,", "Senhor,", "Deus,", "Jesus,")):
+                result["devotional_prayer"] = paragraph
                 break
-            if "ore comigo" in p.lower() or "reflita sobre" in p.lower():
+            if "ore comigo" in paragraph.lower() or "reflita sobre" in paragraph.lower():
                 continue
-            result["devotional_prayer"] = p
+            result["devotional_prayer"] = paragraph
             break
     else:
         body_parts = content_paragraphs
@@ -168,13 +208,13 @@ def _scrape_post_detail(url: str, client: httpx.Client) -> dict:
     return result
 
 
-def scrape_reflexoes() -> dict:
-    """Faz scraping da listagem wgospel.com/tempoderefletir/ e de cada post individual.
+async def run_etl(db: AsyncSession) -> dict:
+    """Faz scraping da listagem wgospel.com/tempoderefletir/ e persiste no banco.
 
-    Salva os posts coletados em data/posts.json (merge com existentes).
     Retorna dict com status da execução.
     """
     started_at = _now_iso()
+    repo = PostRepository(db)
 
     with httpx.Client() as client:
         resp = _fetch(SOURCE_URL, client)
@@ -193,9 +233,12 @@ def scrape_reflexoes() -> dict:
         if not post_items:
             post_items = soup.select("[class*='post'][class*='type-post']")
 
-        posts: list[dict] = []
+        posts_collected = 0
+        new_posts = 0
 
-        for item in post_items[:20]:
+        # Inverte a ordem: processa do mais antigo para o mais recente,
+        # garantindo que os posts mais recentes tenham o maior created_at.
+        for item in reversed(post_items[:20]):
             if not isinstance(item, Tag):
                 continue
 
@@ -211,22 +254,20 @@ def scrape_reflexoes() -> dict:
             if not title or not href:
                 continue
 
-            date_text = date_el.get_text(strip=True) if date_el else ""
+            date_raw = date_el.get_text(strip=True) if date_el else ""
+            date_text = _parse_date_br(date_raw)  # "2026-02-22" ou texto original
             excerpt_text = excerpt_el.get_text(separator=" ", strip=True) if excerpt_el else ""
 
             img_el = item.select_one("div.image_wrapper img")
             thumbnail_url = None
             if img_el:
-                thumbnail_url = (
-                    img_el.get("src")
-                    or img_el.get("data-src")
-                    or img_el.get("data-lazy-src")
-                )
-                if thumbnail_url and not thumbnail_url.startswith("http"):
-                    thumbnail_url = "https://www.wgospel.com" + thumbnail_url
+                raw_src = img_el.get("src") or img_el.get("data-src") or img_el.get("data-lazy-src")
+                if raw_src:
+                    thumbnail_url = str(raw_src)
+                    if not thumbnail_url.startswith("http"):
+                        thumbnail_url = "https://www.wgospel.com" + thumbnail_url
 
             reference, verse_snippet = _parse_excerpt_reference(excerpt_text)
-            post_id = f"post-{uuid.uuid5(uuid.NAMESPACE_URL, str(href)).hex[:8]}"
 
             detail = _scrape_post_detail(str(href), client)
 
@@ -238,52 +279,37 @@ def scrape_reflexoes() -> dict:
             ai_summary = first_paragraph
             meditation = body_text or "Reflita sobre esta passagem ao longo do dia."
 
-            key_points: list[str] = []
-            if body_text:
-                sentences = re.split(r"(?<=[.!?])\s+", body_text)
-                key_points = [s for s in sentences[:5] if 20 < len(s) < 200][:3]
-
-            posts.append({
-                "id": post_id,
+            post_data = {
                 "title": title,
                 "reference": reference,
                 "category": "Tempo de Refletir",
                 "date": date_text,
                 "thumbnail_url": thumbnail_url,
                 "source_url": str(href),
-                "is_new": True,
-                "is_starred": False,
-                "tags": ["Reflexão", "Devocional"],
                 "verse_content": verse_content,
                 "body_text": body_text,
                 "ai_summary": ai_summary,
-                "key_points": key_points,
                 "devotional_meditation": meditation,
                 "devotional_prayer": prayer or "Senhor, obrigado pela Tua palavra. Amém.",
                 "audio_url": detail.get("audio_url"),
                 "audio_duration": detail.get("audio_duration"),
-                "collected_at": _now_iso(),
-            })
+                "tags": ["Reflexão", "Devocional"],
+            }
 
-        existing = read_json("posts.json")
-        existing_list = existing if isinstance(existing, list) else []
-        existing_ids = {p["id"] for p in existing_list if isinstance(p, dict)}
-
-        new_posts = [p for p in posts if p["id"] not in existing_ids]
-        merged = posts + [p for p in existing_list if p["id"] not in {pp["id"] for pp in posts}]
-
-        if merged:
-            write_json("posts.json", merged)
+            _, criado = await repo.upsert(post_data)
+            posts_collected += 1
+            if criado:
+                new_posts += 1
 
     return {
-        "status": "success" if posts else "warning",
+        "status": "success" if posts_collected else "warning",
         "started_at": started_at,
         "finished_at": _now_iso(),
-        "posts_collected": len(posts),
-        "new_posts": len(new_posts),
+        "posts_collected": posts_collected,
+        "new_posts": new_posts,
         "message": (
-            f"{len(posts)} reflexões coletadas ({len(new_posts)} novas) de {SOURCE_URL}"
-            if posts
+            f"{posts_collected} reflexões coletadas ({new_posts} novas) de {SOURCE_URL}"
+            if posts_collected
             else "Nenhuma reflexão encontrada — verifique a estrutura da página."
         ),
     }

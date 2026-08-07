@@ -40,6 +40,11 @@ class ETLExecuteResponse(BaseModel):
     run_id: str
     message: str
     status: str
+    posts_collected: int = 0
+    new_posts: int = 0
+    started_at: str = ""
+    finished_at: str = ""
+    duration: str = ""
 
 
 class SystemAlert(BaseModel):
@@ -52,3 +57,17 @@ class SystemAlert(BaseModel):
 
 class AlertsResponse(BaseModel):
     alerts: list[SystemAlert]
+
+
+class TableStat(BaseModel):
+    table_name: str
+    total_bytes: int
+    data_bytes: int
+    index_bytes: int
+    total_mb: float
+    rows_estimate: int
+
+
+class TableBreakdownResponse(BaseModel):
+    tables: list[TableStat]
+    measured_at: str

@@ -98,41 +98,56 @@ Ao alterar componentes em `vida-com-deus-ui`, rebuilde a biblioteca antes de tes
 ```bash
 # Executar a partir de back-end/
 uv sync                                    # Instalar dependências (cria .venv)
+uv run alembic upgrade head                # Aplicar migrações (requer PostgreSQL configurado)
 uv run uvicorn app.main:app --reload       # Servidor de desenvolvimento (localhost:8000)
-pytest                                     # Todos os testes
+pytest                                     # Todos os testes (50+)
 pytest tests/contract                      # Testes de contrato
 pytest --cov                               # Com cobertura
 ```
 
-Copiar `.env.example` para `.env` e configurar as variáveis antes de rodar. `uv run` ativa o `.venv` automaticamente — não é necessário ativar manualmente.
+Copiar `.env.example` para `.env` e configurar as variáveis antes de rodar. `uv run` ativa o `.venv` automaticamente — não é necessário ativar manualmente. `DATABASE_URL` é obrigatória para os endpoints que usam banco real.
 
 Documentação interativa disponível em `http://localhost:8000/docs` (Swagger UI).
 
 ### Camadas
 
-**Estado atual (Fase 1.5):** Endpoints principais persistem dados em arquivos JSON locais (`data/`).
-Chat bíblico integrado ao GPT-4o-mini (fallback mock quando `OPENAI_API_KEY` ausente).
-Banco de dados (PostgreSQL) e Redis planejados para Fase 2.
+**Estado atual (Fase 2):** autenticação e persistência reais sobre PostgreSQL — modelos
+SQLAlchemy 2.0 async, repositórios, serviços e 6 migrações Alembic que criam o banco do zero.
+Métricas de storage e alertas do admin leem dados reais via `pg_database_size()`.
+
+Estado por categoria:
+
+| Funcionalidade | Estado |
+| --- | --- |
+| Auth (cadastro, login, sessões, rotação/revogação de refresh) | **Implementado** |
+| Usuários, posts, biblioteca, chat, métricas admin | **Implementado** (PostgreSQL) |
+| Recuperação de senha | **Parcial** — token criado, sem envio de email |
+| Chat com IA | **Implementado** — sem `OPENAI_API_KEY`: stub declarado em dev, 503 em produção |
+| Painel therapist | **Simulado** — persiste em `data/patients.json` |
+| Redis / workers | **Planejado** (Fase 3) |
 
 ```text
 app/
 ├── api/v1/          # Routers FastAPI (auth, users, posts, library, chat, admin, therapist)
-├── core/            # config.py (Pydantic Settings), security.py (JWT), dependencies.py,
-│                    # storage.py (leitura/escrita JSON), scraper.py (ETL wgospel.com)
-├── domain/          # Schemas Pydantic por domínio (sem lógica de negócio)
-├── services/        # Lógica de negócio (planejado — Fase 2)
-└── repositories/    # Acesso a dados (planejado — Fase 2)
-data/                # Persistência JSON local (Fase 1.5)
-├── posts.json       # Posts coletados pelo ETL
-├── patients.json    # Pacientes do dashboard do psicólogo
-├── favorites.json   # Favoritos da biblioteca por usuário
-├── users.json       # Perfil do usuário autenticado
+├── core/            # config.py (Settings validadas na inicialização), config_check.py,
+│                    # security.py (JWT tipado), dependencies.py (autenticação),
+│                    # database.py (sessão async), storage.py (JSON — therapist/ETL), scraper.py
+├── domain/          # Schemas Pydantic por domínio (request/response da API)
+├── models/          # SQLAlchemy 2.0 (User, RefreshToken por sessão, Post, Conversation, etc.)
+├── repositories/    # Acesso a dados async (user, post, library, chat)
+├── services/        # Lógica de negócio (auth, user, post, library, chat)
+└── integrations/    # openai_client.py — assistente real + stub declarado
+migrations/          # Alembic — 6 migrações versionadas
+data/                # JSON local — usado apenas pelo therapist e histórico de ETL
+├── patients.json    # Pacientes do dashboard do psicólogo (não migrado)
 └── etl_runs.json    # Histórico das execuções de ETL (últimas 20)
 ```
 
 **Roteamento:** `app/api/router.py` agrega todos os domínios sob o prefixo `/v1`. Ponto de entrada: `app/main.py`.
 
-**Autenticação:** JWT com par access/refresh token. Lógica em `app/core/security.py`. Access token: 15 min; refresh token: 7 dias.
+**Autenticação:** JWT com par access/refresh tipados (claim `type` obrigatório) e sessão (`sid`).
+Access token: 15 min; refresh: 7 dias, com rotação, revogação e detecção de reuso. No banco só
+o SHA-256 do refresh; senhas apenas como hash Argon2. Detalhes em `back-end/CLAUDE.md`.
 
 **CORS:** configurado para `localhost:5173` e `localhost:3000`.
 
@@ -140,13 +155,13 @@ data/                # Persistência JSON local (Fase 1.5)
 
 | Domínio | Prefixo |
 | ------- | ------- |
-| Auth | `POST /v1/auth/{signup,login,refresh,logout,forgot-password,reset-password}` |
+| Auth | `POST /v1/auth/{signup,login,refresh,logout,logout-all,forgot-password,reset-password}` |
 | Usuário | `GET/PATCH /v1/users/me`, `GET/PATCH /v1/users/me/settings` |
 | Posts | `GET /v1/posts/feed`, `GET /v1/posts/{id}`, `GET /v1/posts/{id}/audio` |
 | Biblioteca | `GET /v1/library/`, `POST/DELETE /v1/library/favorites/{id}` |
 | Chat | `POST/GET /v1/chat/conversations`, `POST/GET /v1/chat/conversations/{id}/messages` |
 | Therapist | `GET /v1/therapist/overview`, `GET/POST /v1/therapist/patients`, `GET/PATCH /v1/therapist/patients/{id}`, `PATCH .../status`, `PATCH .../limit`, `GET/POST .../sessions`, `PATCH .../sessions/{sid}` |
-| Admin | `GET /v1/admin/metrics/storage`, `GET /v1/admin/alerts`, `POST /v1/admin/etl/runs/execute` |
+| Admin | `GET /v1/admin/metrics/storage`, `GET /v1/admin/metrics/growth`, `GET /v1/admin/metrics/tables`, `GET /v1/admin/alerts`, `GET /v1/admin/etl/runs`, `POST /v1/admin/etl/runs/execute` |
 | Health | `GET /health` |
 
 ---
@@ -154,6 +169,9 @@ data/                # Persistência JSON local (Fase 1.5)
 ## Documentação do Projeto
 
 - `back-end/arquitetura-back-end.md` — decisões arquiteturais, contratos de API, estratégia de testes
+- `back-end/docs/decisoes-fase2.md` — decisões arquiteturais da Fase 2 (PostgreSQL, Argon2, Alembic)
+- `docs/tasks/auth-persistence-plan.md` — plano e decisões da migração de autenticação/sessões
+- `back-end/docs/testes.md` — estratégia e matriz de testes
 - `front-end/docs/etapas.md` — histórico de trabalho concluído
 - `front-end/docs/registro-features.md` — template obrigatório para registrar novas features
 

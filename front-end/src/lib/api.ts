@@ -109,7 +109,16 @@ export interface ETLRun {
   error: string | null
 }
 export interface ETLRunsResponse { runs: ETLRun[] }
-export interface ETLExecuteResponse { run_id: string; message: string; status: string }
+export interface ETLExecuteResponse {
+  run_id: string
+  message: string
+  status: string
+  posts_collected: number
+  new_posts: number
+  started_at: string
+  finished_at: string
+  duration: string
+}
 export interface SystemAlert {
   id: string
   title: string
@@ -118,6 +127,18 @@ export interface SystemAlert {
   triggered_at: string
 }
 export interface AlertsResponse { alerts: SystemAlert[] }
+export interface TableStat {
+  table_name: string
+  total_bytes: number
+  data_bytes: number
+  index_bytes: number
+  total_mb: number
+  rows_estimate: number
+}
+export interface TableBreakdownResponse {
+  tables: TableStat[]
+  measured_at: string
+}
 
 // Therapist
 export type MoodLevel = "very_low" | "low" | "neutral" | "good" | "great"
@@ -341,8 +362,15 @@ export const authApi = {
       method: "POST",
       body: JSON.stringify({ name, email, password }),
     }),
-  logout: () =>
-    apiFetch<MessageResponse>("/auth/logout", { method: "POST" }),
+  // O refresh token vai no corpo para que o servidor revogue a sessão — sem ele
+  // o logout apagaria o token só no cliente, e a sessão continuaria válida.
+  logout: (refreshToken?: string) =>
+    apiFetch<MessageResponse>("/auth/logout", {
+      method: "POST",
+      body: JSON.stringify({ refresh_token: refreshToken ?? null }),
+    }),
+  logoutAll: () =>
+    apiFetch<MessageResponse>("/auth/logout-all", { method: "POST" }),
   forgotPassword: (email: string) =>
     apiFetch<MessageResponse>("/auth/forgot-password", {
       method: "POST",
@@ -395,6 +423,7 @@ export const adminApi = {
   executeEtl: () =>
     apiFetch<ETLExecuteResponse>("/admin/etl/runs/execute", { method: "POST" }),
   getAlerts: () => apiFetch<AlertsResponse>("/admin/alerts"),
+  getTableMetrics: () => apiFetch<TableBreakdownResponse>("/admin/metrics/tables"),
 }
 
 // ── Therapist ─────────────────────────────────────────────────────────────────
@@ -440,13 +469,27 @@ export const therapistApi = {
 }
 
 // ── Chat ─────────────────────────────────────────────────────────────────────
-const CONV_ID = "conv-001" // Fase 1: conversa mock fixa
+export interface Conversation {
+  id: string
+  user_id: string
+  created_at: string
+  message_count?: number
+  last_message_preview?: string | null
+}
+
+export interface ConversationListResponse {
+  conversations: Conversation[]
+}
 
 export const chatApi = {
-  getMessages: () =>
-    apiFetch<MessagesResponse>(`/chat/conversations/${CONV_ID}/messages`),
-  sendMessage: (content: string) =>
-    apiFetch<SendMessageResponse>(`/chat/conversations/${CONV_ID}/messages`, {
+  listConversations: () =>
+    apiFetch<ConversationListResponse>(`/chat/conversations`),
+  createConversation: () =>
+    apiFetch<Conversation>(`/chat/conversations`, { method: "POST" }),
+  getMessages: (conversationId: string) =>
+    apiFetch<MessagesResponse>(`/chat/conversations/${conversationId}/messages`),
+  sendMessage: (conversationId: string, content: string) =>
+    apiFetch<SendMessageResponse>(`/chat/conversations/${conversationId}/messages`, {
       method: "POST",
       body: JSON.stringify({ content }),
     }),
