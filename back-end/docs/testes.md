@@ -76,6 +76,17 @@ signifique "os testes de banco não rodaram".
 autenticação e serviços substituídos por fixtures. Os overrides ficam em fixture com
 teardown — não vazam para os testes de integração.
 
+### 3.4 Recuperação de senha e perfil
+
+| Arquivo | O que cobre |
+|---|---|
+| `test_password_recovery.py` | resposta indistinguível para email inexistente; hash do token; troca de senha; revogação das sessões; token inválido, expirado e reutilizado |
+| `test_user_profile.py` | atualização de perfil; criação, leitura e persistência das configurações do usuário |
+
+`tests/unit/test_auth_service_failures.py` cobre ainda os ramos de falha que não
+precisam de banco: email duplicado, usuário inativo, refresh ausente/revogado ou
+com sujeito divergente, sessão malformada e token de reset órfão.
+
 ---
 
 ## 4. Cobertura de código
@@ -90,6 +101,9 @@ uv run pytest \
 ```
 
 Relatório navegável: `uv run pytest --cov=app --cov-report=html` → `htmlcov/index.html`.
+
+Validação local de 31/07/2026 contra PostgreSQL 16 real: **130 testes passaram**
+e a cobertura dos módulos de autenticação/autorização ficou em **85,64%**.
 
 ---
 

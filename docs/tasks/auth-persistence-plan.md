@@ -94,3 +94,24 @@ Contratos preservados: signup/login/refresh/logout retornam os mesmos schemas (`
 | Chat com IA | Implementado (real com chave; stub declarado em dev; 503 em produção sem chave) |
 | Citações bíblicas extraídas da resposta real | Planejado |
 | Painel therapist | Simulado (JSON local — fora do escopo desta tarefa) |
+
+## 7. Validação local final — 31/07/2026
+
+Um PostgreSQL 16 efêmero foi iniciado fora do repositório e removido após a
+validação. A cadeia completa de migrations em banco limpo, o downgrade da última
+migration e o novo upgrade passaram.
+
+O primeiro ensaio revelou duas lacunas que fariam o CI falhar: testes de
+configuração herdavam `JWT_SECRET_KEY`/`DATABASE_URL` do próprio job e a cobertura
+real estava em 69,15%, apesar do limiar documentado de 80%. Os testes foram
+isolados do ambiente e ampliados para recuperação de senha, revogação, perfil,
+configurações e ramos seguros de falha.
+
+Resultado final:
+
+- 130 testes passaram contra PostgreSQL real;
+- cobertura de autenticação/autorização: 85,64%;
+- Ruff, Black check e mypy passaram;
+- import da aplicação passou;
+- working tree contém somente os testes e esta atualização documental,
+  aguardando commit manual.
