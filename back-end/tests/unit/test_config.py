@@ -39,12 +39,14 @@ def test_segredo_placeholder_e_rejeitado(placeholder: str):
         _settings(jwt_secret_key=placeholder)
 
 
-def test_segredo_ausente_e_rejeitado():
+def test_segredo_ausente_e_rejeitado(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
     with pytest.raises(ValidationError):
         Settings(_env_file=None, database_url=VALID["database_url"])  # type: ignore[call-arg]
 
 
-def test_database_url_ausente_e_rejeitada():
+def test_database_url_ausente_e_rejeitada(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     with pytest.raises(ValidationError):
         Settings(_env_file=None, jwt_secret_key=VALID["jwt_secret_key"])  # type: ignore[call-arg]
 
